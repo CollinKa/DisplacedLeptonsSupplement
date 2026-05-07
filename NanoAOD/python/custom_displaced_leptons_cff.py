@@ -16,17 +16,40 @@ def DropUnneededTasks(process):
     """
     Remove tables not relevant to a displaced dilepton analysis.
     Keeps muons, electrons, vertices, tracks, triggers, and PF candidates.
+
+    Run 3 uses a task-based system (nanoTableTaskCommon); Run 2 uses a sequence
+    (nanoSequenceCommon). In the Run 2 case we only remove the table-producing
+    modules, not the upstream producer sequences, because linkedObjects still
+    needs finalTaus, finalPhotons, etc. to be present.
     """
-    for task in [
-        "photonTablesTask",
-        "metTablesTask",
-        "tauTablesTask",
-        "boostedTauTablesTask",
-        "jetPuppiTablesTask",
-        "jetAK8TablesTask",
-        "jetConstituentsTablesTask",
-    ]:
-        process.nanoTableTaskCommon.remove(getattr(process, task))
+    if hasattr(process, 'nanoTableTaskCommon'):
+        # Run 3
+        for name in [
+            "photonTablesTask",
+            "metTablesTask",
+            "tauTablesTask",
+            "boostedTauTablesTask",
+            "jetPuppiTablesTask",
+            "jetAK8TablesTask",
+            "jetConstituentsTablesTask",
+        ]:
+            if hasattr(process, name):
+                process.nanoTableTaskCommon.remove(getattr(process, name))
+    else:
+        # Run 2
+        for name in [
+            "photonTables",
+            "metTables",
+            "tauTables",
+            "isoTrackTables",
+            "isoTrackSequence",
+            "jetTables",
+        ]:
+            if hasattr(process, name):
+                try:
+                    process.nanoSequenceCommon.remove(getattr(process, name))
+                except Exception:
+                    pass  # already excluded by era modifier
 
     return process
 
