@@ -91,11 +91,11 @@ def AddMuonTrackVars(process):
 
     # Full 5x5 covariance (upper triangle, 15 elements)
     for i, j in _COV_INDICES:
-        name = f"innerTrack_cov_{_PERIGEE_PARAMS[i]}_{_PERIGEE_PARAMS[j]}"
+        name = "innerTrack_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
         setattr(t, name, Var(
-            f"? innerTrack().isNonnull() ? innerTrack().covariance({i},{j}) : -99",
+            "? innerTrack().isNonnull() ? innerTrack().covariance({},{}) : -99".format(i, j),
             float,
-            doc=f"inner track cov({_PERIGEE_PARAMS[i]}, {_PERIGEE_PARAMS[j]})",
+            doc="inner track cov({}, {})".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j]),
             precision=-1))
 
     # Timing
@@ -141,11 +141,11 @@ def AddElectronTrackVars(process):
 
     # Full 5x5 covariance (upper triangle, 15 elements)
     for i, j in _COV_INDICES:
-        name = f"gsfTrack_cov_{_PERIGEE_PARAMS[i]}_{_PERIGEE_PARAMS[j]}"
+        name = "gsfTrack_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
         setattr(t, name, Var(
-            f"? gsfTrack().isNonnull() ? gsfTrack().covariance({i},{j}) : -99",
+            "? gsfTrack().isNonnull() ? gsfTrack().covariance({},{}) : -99".format(i, j),
             float,
-            doc=f"GSF track cov({_PERIGEE_PARAMS[i]}, {_PERIGEE_PARAMS[j]})",
+            doc="GSF track cov({}, {})".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j]),
             precision=-1))
 
     return process
