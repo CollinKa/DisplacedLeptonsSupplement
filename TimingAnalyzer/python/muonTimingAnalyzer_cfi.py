@@ -1,8 +1,8 @@
 import FWCore.ParameterSet.Config as cms
 
 muonTimingAnalyzer = cms.EDAnalyzer("MuonTimingAnalyzer",
-    # finalMuons: era-correct selection applied by muonSequence from muons_cff
-    muonSrc     = cms.InputTag("finalMuons"),
-    # slimmedElectrons: pt > 5 cut applied in C++ (matches NanoAOD finalElectrons)
+    # NanoAODv9 selection applied in C++: pt > 3 && (standard IDs)
+    muonSrc     = cms.InputTag("slimmedMuons"),
+    # NanoAODv9 selection applied in C++: pt > 5
     electronSrc = cms.InputTag("slimmedElectrons"),
 )

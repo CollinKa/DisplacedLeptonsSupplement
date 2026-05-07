@@ -1,5 +1,5 @@
-#ifndef NanoSupplement_TimingAnalyzer_MuonTimingAnalyzer_h
-#define NanoSupplement_TimingAnalyzer_MuonTimingAnalyzer_h
+#ifndef DisplacedLeptonsNanoSupplement_TimingAnalyzer_MuonTimingAnalyzer_h
+#define DisplacedLeptonsNanoSupplement_TimingAnalyzer_MuonTimingAnalyzer_h
 
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 #include "DataFormats/PatCandidates/interface/Electron.h"
@@ -21,9 +21,8 @@ private:
   void beginJob() override;
   void analyze(const edm::Event &, const edm::EventSetup &) override;
 
-  // finalMuons: PATMuonRefSelector output, consumed as View
-  edm::EDGetTokenT<edm::View<pat::Muon>> muonToken_;
-  // slimmedElectrons: consumed directly, pt > 5 applied in analyze()
+  // Both consumed directly from MiniAOD; selection applied in analyze()
+  edm::EDGetTokenT<std::vector<pat::Muon>>     muonToken_;
   edm::EDGetTokenT<std::vector<pat::Electron>> electronToken_;
 
   edm::Service<TFileService> fs_;

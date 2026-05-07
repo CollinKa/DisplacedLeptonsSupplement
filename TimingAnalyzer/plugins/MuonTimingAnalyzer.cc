@@ -2,8 +2,8 @@
 #include "FWCore/Framework/interface/MakerMacros.h"
 
 MuonTimingAnalyzer::MuonTimingAnalyzer(const edm::ParameterSet &iConfig) :
-  muonToken_    (consumes<edm::View<pat::Muon>>        (iConfig.getParameter<edm::InputTag>("muonSrc"))),
-  electronToken_(consumes<std::vector<pat::Electron>>  (iConfig.getParameter<edm::InputTag>("electronSrc")))
+  muonToken_    (consumes<std::vector<pat::Muon>>     (iConfig.getParameter<edm::InputTag>("muonSrc"))),
+  electronToken_(consumes<std::vector<pat::Electron>> (iConfig.getParameter<edm::InputTag>("electronSrc")))
 {}
 
 void MuonTimingAnalyzer::beginJob() {
@@ -33,9 +33,16 @@ void MuonTimingAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup
   muon_timeAtIpInOut_.clear(); muon_timeNDof_.clear();
   electron_pt_.clear(); electron_eta_.clear(); electron_phi_.clear();
 
-  edm::Handle<edm::View<pat::Muon>> muons;
+  edm::Handle<std::vector<pat::Muon>> muons;
   iEvent.getByToken(muonToken_, muons);
   for (const auto &mu : *muons) {
+    // NanoAODv9 (run2_nanoAOD_106Xv1) selection: pt > 3 && at least one standard ID
+    if (mu.pt() <= 3) continue;
+    if (!mu.passed(reco::Muon::CutBasedIdLoose)        &&
+        !mu.passed(reco::Muon::SoftCutBasedId)          &&
+        !mu.passed(reco::Muon::SoftMvaId)               &&
+        !mu.passed(reco::Muon::CutBasedIdGlobalHighPt)  &&
+        !mu.passed(reco::Muon::CutBasedIdTrkHighPt)) continue;
     muon_pt_.push_back(mu.pt());
     muon_eta_.push_back(mu.eta());
     muon_phi_.push_back(mu.phi());
