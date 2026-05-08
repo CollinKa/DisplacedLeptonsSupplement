@@ -2,18 +2,20 @@
 """
 Verify a custom NanoAOD file against centrally produced NanoAOD.
 
-Queries DAS only for the runs present in the custom file, so the lumi→file
-map stays small regardless of dataset size.
-
-Usage:
+Standalone mode (queries DAS automatically):
     python verify_nano.py custom.root /Dataset/Name/NANOAOD
     python verify_nano.py custom.root /Dataset/Name/NANOAOD --branches Muon_pt Muon_eta
     python verify_nano.py custom.root /Dataset/Name/NANOAOD --max-events 10000
+
+Batch mode (central files supplied directly, no DAS query):
+    python verify_nano.py custom.root --central-files /store/.../f1.root /store/.../f2.root
+    python verify_nano.py custom.root --eos --central-files /store/.../f1.root --output-json result.json
 """
 
 import argparse
 import json
 import subprocess
+import sys
 from collections import defaultdict
 
 import awkward as ak
@@ -157,14 +159,30 @@ def values_match(a, b):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("custom_file", help="Path to custom NanoAOD file")
-    parser.add_argument("dataset", help="Central NanoAOD dataset name in DAS (e.g. /X/Y/NANOAOD)")
+    parser.add_argument("custom_file", help="Path or LFN of custom NanoAOD file")
+    parser.add_argument("dataset", nargs="?", default=None,
+                        help="Central NanoAOD dataset in DAS (standalone mode)")
+    parser.add_argument("--central-files", nargs="+", metavar="LFN",
+                        help="Central file LFNs to compare against, skipping DAS (batch mode)")
     parser.add_argument("--branches", nargs="+", default=DEFAULT_BRANCHES, metavar="BRANCH",
                         help="Branches to compare (default: 15 muon/electron branches)")
     parser.add_argument("--max-events", type=int, default=None, metavar="N",
                         help="Stop after comparing N events (useful for a quick check)")
-    parser.add_argument("--eos", action="store_true", help="Indicates the custom file is stored in EOS")
+    parser.add_argument("--eos", action="store_true",
+                        help="Prepend XRootD EOS prefix to custom file path")
+    parser.add_argument("--output-json", metavar="PATH",
+                        help="Write a JSON summary of results to this path")
     args = parser.parse_args()
+
+    if args.dataset is None and not args.central_files:
+        parser.error("provide a dataset (standalone mode) or --central-files (batch mode)")
+    if args.dataset and args.central_files:
+        parser.error("dataset and --central-files are mutually exclusive")
+
+    error_counts = defaultdict(int)
+    error_examples = defaultdict(list)
+    n_not_in_central = 0
+    n_compared = 0
 
     # --- Load custom file ---
     print(f"\nLoading custom file: {args.custom_file}")
@@ -176,68 +194,50 @@ def main():
         print(f"  WARNING: branches absent from custom file (skipped): {missing_from_custom}")
     print(f"  {len(custom_events)} events, {len(branches)} branches to check")
 
-    # --- Query DAS for only the runs present in this file ---
-    runs = set(int(r) for r in ak.to_list(custom_events.run))
-    print(f"\nQuerying DAS for {len(runs)} run(s) in dataset: {args.dataset}")
-    lumi_to_file = build_lumi_to_file_map(args.dataset, runs)
-    print(f"  {len(lumi_to_file)} (run, lumi) pairs mapped to central files")
+    # -------------------------------------------------------------------------
+    # Batch mode: central files provided directly, no DAS query
+    # -------------------------------------------------------------------------
+    if args.central_files:
+        print(f"\nBatch mode: opening {len(args.central_files)} central file(s)")
+        central_events_list = []
+        central_branches = None
+        for lfn in args.central_files:
+            url = XROOTD_PREFIX + lfn
+            print(f"  {url}")
+            try:
+                c_ev, c_av = load_events(url, branches)
+                central_events_list.append(c_ev)
+                if central_branches is None:
+                    central_branches = c_av
+            except Exception as e:
+                print(f"  ERROR: {e}")
 
-    # --- Group custom row indices by which central file they belong to ---
-    file_to_custom_rows = defaultdict(list)
-    das_missing = []
-    for i, (r, l) in enumerate(zip(ak.to_list(custom_events.run), ak.to_list(custom_events.luminosityBlock))):
-        central_file = lumi_to_file.get((int(r), int(l)))
-        if central_file is not None:
-            file_to_custom_rows[central_file].append(i)
-        else:
-            das_missing.append((int(r), int(l)))
+        if not central_events_list:
+            print("ERROR: could not open any central files.")
+            sys.exit(1)
 
-    if das_missing:
-        unique_missing = set(das_missing)
-        print(f"  WARNING: {len(das_missing)} events from {len(unique_missing)} (run, lumi) pairs not found in DAS")
+        central_events = (
+            ak.concatenate(central_events_list)
+            if len(central_events_list) > 1
+            else central_events_list[0]
+        )
 
-    # --- Compare event by event, one central file at a time ---
-    error_counts = defaultdict(int)
-    error_examples = defaultdict(list)
-    n_not_in_central = 0
-    n_compared = 0
-    done = False
-    central_branches = []
+        if central_branches:
+            report_branch_diff(custom_available, central_branches)
 
-    for central_lfn, custom_rows in file_to_custom_rows.items():
-        if done:
-            break
-
-        central_url = XROOTD_PREFIX + central_lfn
-        print(f"\nOpening central file ({len(custom_rows)} events expected):\n  {central_url}")
-        try:
-            central_events, central_available = load_events(central_url, branches)
-            central_branches = central_available # Assume all central files have same branches
-        except Exception as e:
-            print(f"  ERROR: could not open file: {e}")
-            continue
-
-        missing_from_central = [b for b in branches if b not in central_available]
-        if missing_from_central:
-            print(f"  WARNING: branches absent from this central file: {missing_from_central}")
-        comparable = [b for b in branches if b in central_available]
-
+        comparable = [b for b in branches if b in central_branches]
         central_index = build_event_index(central_events)
 
-        for ci in custom_rows:
+        for ci in range(len(custom_events)):
             if args.max_events is not None and n_compared >= args.max_events:
-                done = True
                 break
-
             r = int(custom_events.run[ci])
             l = int(custom_events.luminosityBlock[ci])
             e = int(custom_events.event[ci])
-
             xi = central_index.get((r, l, e))
             if xi is None:
                 n_not_in_central += 1
                 continue
-
             n_compared += 1
             for branch in comparable:
                 ok, msg = values_match(custom_events[branch][ci], central_events[branch][xi])
@@ -246,9 +246,76 @@ def main():
                     if len(error_examples[branch]) < MAX_ERRORS_PER_BRANCH:
                         error_examples[branch].append(f"run={r} lumi={l} event={e}: {msg}")
 
-    # --- Compare available branches between custom and central ---
-    if central_branches:
-        report_branch_diff(custom_available, central_branches)
+    # -------------------------------------------------------------------------
+    # Standalone mode: query DAS to find central files
+    # -------------------------------------------------------------------------
+    else:
+        runs = set(int(r) for r in ak.to_list(custom_events.run))
+        print(f"\nQuerying DAS for {len(runs)} run(s) in dataset: {args.dataset}")
+        lumi_to_file = build_lumi_to_file_map(args.dataset, runs)
+        print(f"  {len(lumi_to_file)} (run, lumi) pairs mapped to central files")
+
+        file_to_custom_rows = defaultdict(list)
+        das_missing = []
+        for i, (r, l) in enumerate(zip(ak.to_list(custom_events.run), ak.to_list(custom_events.luminosityBlock))):
+            central_file = lumi_to_file.get((int(r), int(l)))
+            if central_file is not None:
+                file_to_custom_rows[central_file].append(i)
+            else:
+                das_missing.append((int(r), int(l)))
+
+        if das_missing:
+            unique_missing = set(das_missing)
+            print(f"  WARNING: {len(das_missing)} events from {len(unique_missing)} (run, lumi) pairs not found in DAS")
+
+        done = False
+        central_branches = None
+
+        for central_lfn, custom_rows in file_to_custom_rows.items():
+            if done:
+                break
+
+            central_url = XROOTD_PREFIX + central_lfn
+            print(f"\nOpening central file ({len(custom_rows)} events expected):\n  {central_url}")
+            try:
+                central_events, central_available = load_events(central_url, branches)
+                if central_branches is None:
+                    central_branches = central_available
+            except Exception as e:
+                print(f"  ERROR: could not open file: {e}")
+                continue
+
+            if central_branches is not None and central_branches is central_available:
+                report_branch_diff(custom_available, central_branches)
+
+            missing_from_central = [b for b in branches if b not in central_available]
+            if missing_from_central:
+                print(f"  WARNING: branches absent from this central file: {missing_from_central}")
+            comparable = [b for b in branches if b in central_available]
+
+            central_index = build_event_index(central_events)
+
+            for ci in custom_rows:
+                if args.max_events is not None and n_compared >= args.max_events:
+                    done = True
+                    break
+
+                r = int(custom_events.run[ci])
+                l = int(custom_events.luminosityBlock[ci])
+                e = int(custom_events.event[ci])
+
+                xi = central_index.get((r, l, e))
+                if xi is None:
+                    n_not_in_central += 1
+                    continue
+
+                n_compared += 1
+                for branch in comparable:
+                    ok, msg = values_match(custom_events[branch][ci], central_events[branch][xi])
+                    if not ok:
+                        error_counts[branch] += 1
+                        if len(error_examples[branch]) < MAX_ERRORS_PER_BRANCH:
+                            error_examples[branch].append(f"run={r} lumi={l} event={e}: {msg}")
 
     # --- Report ---
     print(f"\n{'='*65}")
@@ -276,6 +343,22 @@ def main():
         print("FAIL: branch mismatches found.")
     else:
         print("PASS: all compared branches agree.")
+
+    # --- Write JSON summary (batch mode) ---
+    if args.output_json:
+        summary = {
+            "custom_file": args.custom_file,
+            "n_compared": n_compared,
+            "n_not_in_central": n_not_in_central,
+            "status": "FAIL" if any_fail else "PASS",
+            "branches": {
+                b: {"ok": error_counts[b] == 0, "mismatches": error_counts[b], "examples": error_examples[b]}
+                for b in branches
+            },
+        }
+        with open(args.output_json, "w") as f:
+            json.dump(summary, f, indent=2)
+        print(f"Results written to {args.output_json}")
 
 
 if __name__ == "__main__":
