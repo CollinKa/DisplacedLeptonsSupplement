@@ -96,6 +96,38 @@ def build_event_index(events):
     }
 
 
+def extract_collection(branch):
+    """Return the NanoAOD collection name for a branch, or None for scalars.
+
+    'Muon_pt' -> 'Muon', 'nMuon' -> 'Muon', 'run' -> None.
+    """
+    if '_' in branch:
+        return branch.split('_')[0]
+    if branch.startswith('n') and len(branch) > 1 and branch[1].isupper():
+        return branch[1:]
+    return None
+
+
+def report_branch_diff(custom_available, central_available):
+    extra = sorted(custom_available - central_available)
+    if extra:
+        print(f"\nExtra branches in custom file ({len(extra)}):")
+        for b in extra:
+            print(f"  + {b}")
+    else:
+        print("\nNo extra branches in custom file.")
+
+    central_collections = {extract_collection(b) for b in central_available} - {None}
+    custom_collections = {extract_collection(b) for b in custom_available} - {None}
+    missing = sorted(central_collections - custom_collections)
+    if missing:
+        print(f"\nCollections entirely missing from custom file ({len(missing)}):")
+        for c in missing:
+            print(f"  - {c}")
+    else:
+        print("\nNo collections entirely missing from custom file.")
+
+
 def values_match(a, b):
     """
     Compare one event's worth of values from two branches.
@@ -215,8 +247,8 @@ def main():
                         error_examples[branch].append(f"run={r} lumi={l} event={e}: {msg}")
 
     # --- Compare available branches between custom and central ---
-    in_central_only = [b for b in central_branches if b not in custom_available]
-    in_custom_only = [b for b in custom_available if b not in central_branches]
+    if central_branches:
+        report_branch_diff(custom_available, central_branches)
 
     # --- Report ---
     print(f"\n{'='*65}")
