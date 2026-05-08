@@ -151,9 +151,9 @@ def main():
             print(f"  WARNING: no central files found for {Path(lfn).name}, skipping")
             continue
         jobs.append({
-            "custom_lfn":   lfn,
-            "central_csv":  ",".join(central_lfns),
-            "output_json":  str(results_dir / (Path(lfn).stem + ".json")),
+            "custom_lfn":  lfn,
+            "central_csv": ",".join(central_lfns),
+            "output_json": Path(lfn).stem + ".json",  # local filename; condor transfers it back
         })
 
     print(f"\n{len(jobs)} job(s) to submit")
@@ -165,19 +165,21 @@ def main():
 
     with open(submit_path, "w") as f:
         f.write(f"""\
-universe            = vanilla
-executable          = {wrapper_script}
-transfer_input_files = {verify_script}
-output              = {logs_dir}/verify_$(Process).out
-error               = {logs_dir}/verify_$(Process).err
-log                 = {logs_dir}/condor.log
-use_x509userproxy   = true
-request_memory      = 2048
-request_cpus        = 1
-request_disk        = 2097152
-+ProjectName        = "cms"
+universe              = vanilla
+executable            = {wrapper_script}
+transfer_input_files  = {verify_script}
+initialdir            = {results_dir}
+output                = {logs_dir}/verify_$(Process).out
+error                 = {logs_dir}/verify_$(Process).err
+log                   = {logs_dir}/condor.log
+use_x509userproxy     = true
+request_memory        = 2048
+request_cpus          = 1
+request_disk          = 2097152
++ProjectName          = "cms"
 
-arguments = "$(custom_lfn) $(central_csv) $(output_json)"
+arguments             = "$(custom_lfn) $(central_csv) $(output_json)"
+transfer_output_files = $(output_json)
 """)
         for job in jobs:
             f.write(
