@@ -31,8 +31,7 @@ source /cvmfs/sft.cern.ch/lcg/views/LCG_106/x86_64-el9-gcc13-opt/setup.sh
 # Convert comma-separated central LFNs to space-separated arguments
 CENTRAL_ARGS=$(echo "$CENTRAL_CSV" | tr ',' ' ')
 
-python verify_nano.py \
-    --custom-file "$CUSTOM_LFN" \
+python verify_nano.py "$CUSTOM_LFN" \
     --eos \
     --central-files $CENTRAL_ARGS \
     --output-json "$OUTPUT_JSON"
