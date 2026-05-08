@@ -105,8 +105,8 @@ def main():
                         help="Write submit file but do not call condor_submit")
     args = parser.parse_args()
 
-    results_dir = Path(args.results_dir).resolve()
-    results_dir.mkdir(exist_ok=True)
+    results_dir = Path(args.results_dir).resolve() / Path(args.task_dir).name
+    results_dir.mkdir(parents=True, exist_ok=True)
     logs_dir = Path("logs").resolve()
     logs_dir.mkdir(exist_ok=True)
 
