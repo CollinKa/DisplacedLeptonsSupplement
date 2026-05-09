@@ -71,6 +71,7 @@ config.General.transferLogs = True
 
 config.JobType.pluginName = 'Analysis'
 config.JobType.psetName = '{pset_name}'
+config.JobType.numCores = {num_cores}
 config.JobType.outputFiles = ['nano.root']   # must match --fileout in cmsDriver
 
 config.Data.inputDataset = '{input_dataset}'
@@ -198,8 +199,10 @@ def build_cmsdriver_cmd(original_args: str, cfg_path: str) -> tuple:
     filein = _get_arg(tokens, "--filein") or ""
     input_dataset = filein.removeprefix("dbs:") if filein.startswith("dbs:") else filein
 
+    num_cores = int(_get_arg(tokens, "--nThreads") or 1)
+
     cmd = "cmsDriver.py " + " ".join(shlex.quote(t) for t in tokens)
-    return cmd, input_dataset
+    return cmd, input_dataset, num_cores
 
 
 def write_crab_config(
@@ -209,6 +212,7 @@ def write_crab_config(
     input_dataset: str,
     data: bool,
     year: int,
+    num_cores: int = 1,
 ) -> None:
     if data:
         splitting = "LumiBased"
@@ -223,14 +227,15 @@ def write_crab_config(
         era = f"UL{str(year)[2:]}"  # 2018 -> UL18
 
     content = CRAB_TEMPLATE.format(
-        request_name=f"{short_name}_customNanoAOD"[:100],
+        request_name="{}_customNanoAOD".format(short_name)[:100],
         pset_name=os.path.abspath(cfg_path),
+        num_cores=num_cores,
         input_dataset=input_dataset,
         splitting=splitting,
         units_per_job=units_per_job,
         lumi_mask_line=lumi_mask_line,
         era=era,
-        output_tag=f"{short_name}_customNanoAOD",
+        output_tag="{}_customNanoAOD".format(short_name),
     )
     with open(crab_path, "w") as f:
         f.write(content)
@@ -257,7 +262,7 @@ def process_dataset(miniaod: str, nanoaod: str, output_dir: str) -> tuple:
     config_text = fetch_config_text(url)
 
     original_args = extract_cmsdriver_args(config_text)
-    cmd, input_dataset = build_cmsdriver_cmd(original_args, cfg_path)
+    cmd, input_dataset, num_cores = build_cmsdriver_cmd(original_args, cfg_path)
 
     print("  Running cmsDriver.py...")
     print(f"    {cmd[:120]}{'...' if len(cmd) > 120 else ''}")
@@ -271,7 +276,7 @@ def process_dataset(miniaod: str, nanoaod: str, output_dir: str) -> tuple:
         input_dataset = miniaod
         print("  Input dataset (crab): {} (from JSON)".format(input_dataset))
 
-    write_crab_config(crab_path, cfg_path, short_name, input_dataset, data, year)
+    write_crab_config(crab_path, cfg_path, short_name, input_dataset, data, year, num_cores)
     kind = "data" if data else "MC"
     print(f"  CRAB config ({kind}, {year}): {crab_path}")
 
