@@ -109,7 +109,7 @@ def get_config_url(nanoaod_dataset: str) -> str:
         f'dasgoclient -query "config dataset={nanoaod_dataset}" -json '
         f"| jq -r '[.[].config[]] | map(select(.idict.byoutputdataset != null)) | .[0].urls[0]'"
     )
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
     url = result.stdout.strip()
     if not url or url == "null":
         raise RuntimeError(f"No config URL returned for NanoAOD dataset: {nanoaod_dataset}")
@@ -124,7 +124,7 @@ def fetch_config_text(url: str) -> str:
         "--cert", proxy, "--key", proxy,
         url,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
     return result.stdout
 
 
