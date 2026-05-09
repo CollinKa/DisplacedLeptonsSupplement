@@ -118,7 +118,12 @@ def get_config_url(nanoaod_dataset: str) -> str:
 
 def fetch_config_text(url: str) -> str:
     proxy = os.environ.get("X509_USER_PROXY", "")
-    cmd = ["curl", "-s", "--cert", proxy, "--key", proxy, url]
+    cmd = [
+        "curl", "-s",
+        "--capath", "/etc/grid-security/certificates/",
+        "--cert", proxy, "--key", proxy,
+        url,
+    ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     return result.stdout
 
