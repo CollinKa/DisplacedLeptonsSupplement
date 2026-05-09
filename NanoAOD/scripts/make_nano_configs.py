@@ -26,12 +26,15 @@ Usage (inside a CMSSW environment):
 """
 
 import argparse
+import http.client
 import json
 import os
 import re
 import shlex
+import ssl
 import subprocess
 import sys
+from urllib.parse import urlparse
 
 CUSTOM_CUSTOMIZE = (
     "DisplacedLeptonsNanoSupplement/NanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsNanoAOD"
@@ -117,21 +120,23 @@ def get_config_url(nanoaod_dataset: str) -> str:
 
 
 def fetch_config_text(url: str) -> str:
+    """Fetch a cmsweb URL authenticated with the VOMS proxy certificate."""
     proxy = os.environ.get("X509_USER_PROXY", "")
     if not proxy:
         raise RuntimeError("X509_USER_PROXY is not set; run voms-proxy-init first")
-    cmd = [
-        "curl", "-s", "--fail",
-        "--capath", "/etc/grid-security/certificates/",
-        "--cert", proxy, "--key", proxy,
-        url,
-    ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    if result.returncode != 0:
-        raise RuntimeError(
-            "curl failed (exit {}): {}\nURL: {}".format(result.returncode, result.stderr.strip(), url)
-        )
-    return result.stdout
+
+    # Use Python's ssl module (OpenSSL-backed in CMSSW) rather than the
+    # system curl, which is NSS-backed on EL7 and cannot parse VOMS proxies.
+    ctx = ssl.create_default_context(capath="/etc/grid-security/certificates/")
+    ctx.load_cert_chain(proxy)
+
+    parsed = urlparse(url)
+    conn = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, context=ctx)
+    conn.request("GET", parsed.path)
+    resp = conn.getresponse()
+    if resp.status != 200:
+        raise RuntimeError("HTTP {} fetching {}".format(resp.status, url))
+    return resp.read().decode("utf-8")
 
 
 def extract_cmsdriver_args(config_text: str) -> str:
