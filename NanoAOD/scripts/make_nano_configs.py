@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
 Generate custom NanoAOD cmsDriver configs and CRAB3 submission configs
-for a list of MiniAOD datasets (both MINIAODSIM and MINIAOD are supported).
+for a list of MiniAOD/NanoAOD dataset pairs.
 
-For each dataset the script:
-  1. Queries DAS for the URL of the config used to generate the central NanoAOD
-     from this MiniAOD.
+For each pair the script:
+  1. Queries DAS for the config used to produce the central NanoAOD dataset.
   2. Fetches that config and extracts the original cmsDriver command-line options.
   3. Runs cmsDriver.py with our customizations applied, producing a cfg.py.
   4. Writes a CRAB3 config that submits the cfg.py against the MiniAOD dataset.
@@ -13,17 +12,26 @@ For each dataset the script:
 
 A submit_all.sh is also written to the output directory.
 
+Input JSON format:
+    [
+      {
+        "miniaod": "/PrimaryDataset/Run2018A-UL2018_MiniAODv2_NanoAODv9-v1/MINIAOD",
+        "nanoaod": "/PrimaryDataset/Run2018A-UL2018_MiniAODv2_NanoAODv9-v1/NANOAOD"
+      },
+      ...
+    ]
+
 Usage (inside a CMSSW environment):
-    python3 NanoAOD/scripts/make_nano_configs.py datasets.txt [--output-dir configs/]
+    python3 NanoAOD/scripts/make_nano_configs.py datasets.json [--output-dir configs/]
 """
 
 import argparse
+import json
 import os
 import re
 import shlex
 import subprocess
 import sys
-import urllib.request
 
 CUSTOM_CUSTOMIZE = (
     "DisplacedLeptonsNanoSupplement/NanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsNanoAOD"
@@ -95,21 +103,24 @@ def detect_year(dataset: str) -> int:
     raise ValueError(f"Could not determine run year from dataset path: {dataset}")
 
 
-def get_config_url(dataset: str) -> str:
+def get_config_url(nanoaod_dataset: str) -> str:
+    """Return the URL of the config that produced the given NanoAOD dataset."""
     cmd = (
-        f'dasgoclient -query "config dataset={dataset}" -json '
-        f"| jq -r '.[0] | .config | .[0] | .urls | .[0]'"
+        f'dasgoclient -query "config dataset={nanoaod_dataset}" -json '
+        f"| jq -r '[.[].config[]] | map(select(.idict.byoutputdataset != null)) | .[0].urls[0]'"
     )
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
     url = result.stdout.strip()
     if not url or url == "null":
-        raise RuntimeError(f"No config URL returned for dataset: {dataset}")
+        raise RuntimeError(f"No config URL returned for NanoAOD dataset: {nanoaod_dataset}")
     return url
 
 
 def fetch_config_text(url: str) -> str:
-    with urllib.request.urlopen(url) as resp:
-        return resp.read().decode("utf-8")
+    proxy = os.environ.get("X509_USER_PROXY", "")
+    cmd = ["curl", "-s", "--cert", proxy, "--key", proxy, url]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    return result.stdout
 
 
 def extract_cmsdriver_args(config_text: str) -> str:
@@ -203,21 +214,21 @@ def write_crab_config(
         f.write(content)
 
 
-def process_dataset(dataset: str, output_dir: str) -> tuple:
-    """Run the full pipeline for one dataset. Returns (cfg_path, crab_path)."""
-    short_name = dataset_short_name(dataset)
+def process_dataset(miniaod: str, nanoaod: str, output_dir: str) -> tuple:
+    """Run the full pipeline for one dataset pair. Returns (cfg_path, crab_path)."""
+    short_name = dataset_short_name(miniaod)
     cfg_path = os.path.join(output_dir, f"{short_name}_NANO.py")
     crab_path = os.path.join(output_dir, f"crab_{short_name}.py")
-    data = is_data(dataset)
+    data = is_data(miniaod)
 
     try:
-        year = detect_year(dataset)
+        year = detect_year(miniaod)
     except ValueError as e:
         print(f"  WARNING: {e}; year-dependent fields will use placeholders")
         year = 0
 
     print("  Querying DAS for config URL...")
-    url = get_config_url(dataset)
+    url = get_config_url(nanoaod)
     print(f"  URL: {url}")
 
     print("  Fetching config file...")
@@ -235,7 +246,7 @@ def process_dataset(dataset: str, output_dir: str) -> tuple:
     else:
         print("  WARNING: could not determine input dataset from --filein")
 
-    write_crab_config(crab_path, cfg_path, short_name, input_dataset, data, year)
+    write_crab_config(crab_path, cfg_path, short_name, input_dataset or miniaod, data, year)
     kind = "data" if data else "MC"
     print(f"  CRAB config ({kind}, {year}): {crab_path}")
 
@@ -249,7 +260,7 @@ def main() -> None:
     )
     parser.add_argument(
         "datasets_file",
-        help="Text file with one MiniAOD dataset per line (lines starting with # are ignored)",
+        help="JSON file with a list of {miniaod, nanoaod} dataset pairs",
     )
     parser.add_argument(
         "--output-dir", "-o", default="configs",
@@ -260,28 +271,26 @@ def main() -> None:
     os.makedirs(args.output_dir, exist_ok=True)
 
     with open(args.datasets_file) as f:
-        datasets = [
-            line.strip()
-            for line in f
-            if line.strip() and not line.startswith("#")
-        ]
+        pairs = json.load(f)
 
-    if not datasets:
-        sys.exit("No datasets found in input file.")
+    if not pairs:
+        sys.exit("No dataset pairs found in input file.")
 
-    print(f"Processing {len(datasets)} dataset(s) -> {args.output_dir}/\n")
+    print(f"Processing {len(pairs)} dataset pair(s) -> {args.output_dir}/\n")
 
     crab_configs = []
     failed = []
-    for dataset in datasets:
-        print(f"[{dataset}]")
+    for pair in pairs:
+        miniaod = pair["miniaod"]
+        nanoaod = pair["nanoaod"]
+        print(f"[{miniaod}]")
         try:
-            cfg_path, crab_path = process_dataset(dataset, args.output_dir)
+            cfg_path, crab_path = process_dataset(miniaod, nanoaod, args.output_dir)
             crab_configs.append(crab_path)
             print(f"  OK: {cfg_path}\n")
         except Exception as exc:
             print(f"  FAILED: {exc}\n", file=sys.stderr)
-            failed.append(dataset)
+            failed.append(miniaod)
 
     submit_script = os.path.join(args.output_dir, "submit_all.sh")
     with open(submit_script, "w") as f:
