@@ -118,13 +118,19 @@ def get_config_url(nanoaod_dataset: str) -> str:
 
 def fetch_config_text(url: str) -> str:
     proxy = os.environ.get("X509_USER_PROXY", "")
+    if not proxy:
+        raise RuntimeError("X509_USER_PROXY is not set; run voms-proxy-init first")
     cmd = [
-        "curl", "-s",
+        "curl", "-s", "--fail",
         "--capath", "/etc/grid-security/certificates/",
         "--cert", proxy, "--key", proxy,
         url,
     ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            "curl failed (exit {}): {}\nURL: {}".format(result.returncode, result.stderr.strip(), url)
+        )
     return result.stdout
 
 
