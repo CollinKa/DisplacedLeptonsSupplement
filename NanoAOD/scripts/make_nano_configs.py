@@ -147,8 +147,14 @@ def extract_cmsdriver_args(config_text: str) -> str:
 
 
 def dataset_short_name(dataset: str) -> str:
-    """Return primary dataset name, e.g. /ST_tW_top_.../.../... -> ST_tW_top_..."""
-    return dataset.strip("/").split("/")[0]
+    """Return a unique short name incorporating the primary dataset and run era.
+
+    /MuonEG/Run2018C-UL2018_MiniAODv2_GT36-v1/MINIAOD -> MuonEG_Run2018C
+    """
+    parts = dataset.strip("/").split("/")
+    primary = parts[0]
+    era = parts[1].split("-")[0] if len(parts) > 1 else ""
+    return "{}_{}".format(primary, era) if era else primary
 
 
 def _set_arg(tokens: list, flag: str, value: str) -> list:
@@ -257,12 +263,15 @@ def process_dataset(miniaod: str, nanoaod: str, output_dir: str) -> tuple:
     print(f"    {cmd[:120]}{'...' if len(cmd) > 120 else ''}")
     subprocess.run(cmd, shell=True, check=True)
 
-    if input_dataset:
-        print(f"  Input dataset (crab): {input_dataset}")
+    # Central configs use _placeholder_.root for --filein; always use the
+    # actual miniaod argument as the CRAB input dataset.
+    if input_dataset and input_dataset.startswith("/"):
+        print("  Input dataset (crab): {}".format(input_dataset))
     else:
-        print("  WARNING: could not determine input dataset from --filein")
+        input_dataset = miniaod
+        print("  Input dataset (crab): {} (from JSON)".format(input_dataset))
 
-    write_crab_config(crab_path, cfg_path, short_name, input_dataset or miniaod, data, year)
+    write_crab_config(crab_path, cfg_path, short_name, input_dataset, data, year)
     kind = "data" if data else "MC"
     print(f"  CRAB config ({kind}, {year}): {crab_path}")
 
