@@ -80,7 +80,7 @@ config.Data.splitting = '{splitting}'
 config.Data.unitsPerJob = {units_per_job}{lumi_mask_line}
 config.Data.publication = False
 
-config.Data.outLFNDirBase = '/store/user/<your_username>/customNanoAOD/{era}/'
+config.Data.outLFNDirBase = '/store/user/lnestor/customNanoAOD/{era}/'
 config.Data.outputDatasetTag = '{output_tag}'
 
 config.Site.storageSite = 'T3_US_FNALLPC'
