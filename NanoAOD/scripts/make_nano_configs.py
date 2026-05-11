@@ -183,7 +183,7 @@ def _get_arg(tokens: list, flag: str):
     return None
 
 
-def build_cmsdriver_cmd(original_args: str, cfg_path: str) -> tuple:
+def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_name: str) -> tuple:
     """
     Apply our customizations to the original cmsDriver args.
     Returns (shell_command_string, input_dataset_string).
@@ -191,10 +191,14 @@ def build_cmsdriver_cmd(original_args: str, cfg_path: str) -> tuple:
     tokens = shlex.split(original_args)
 
     tokens = _set_arg(tokens, "--python_filename", cfg_path)
-    # All crab jobs run in isolation, so a fixed output name is fine.
     tokens = _set_arg(tokens, "--fileout", "file:nano.root")
+    tokens = _set_arg(tokens, "--nThreads", "1")
+    tokens = _set_arg(tokens, "--filein", short_name + "_MiniAOD.root")
     tokens = _append_to_arg(tokens, "--customise", CUSTOM_CUSTOMIZE, ",")
     tokens = _append_to_arg(tokens, "--customise_command", CUSTOM_COMMAND, "; ")
+
+    if data:
+        tokens = _set_arg(tokens, "--eventcontent", "NANOAOD")
 
     filein = _get_arg(tokens, "--filein") or ""
     input_dataset = filein.removeprefix("dbs:") if filein.startswith("dbs:") else filein
@@ -262,7 +266,7 @@ def process_dataset(miniaod: str, nanoaod: str, output_dir: str) -> tuple:
     config_text = fetch_config_text(url)
 
     original_args = extract_cmsdriver_args(config_text)
-    cmd, input_dataset, num_cores = build_cmsdriver_cmd(original_args, cfg_path)
+    cmd, input_dataset, num_cores = build_cmsdriver_cmd(original_args, cfg_path, data, short_name)
 
     print("  Running cmsDriver.py...")
     print(f"    {cmd[:120]}{'...' if len(cmd) > 120 else ''}")
