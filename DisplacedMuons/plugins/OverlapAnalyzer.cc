@@ -37,6 +37,7 @@ OverlapAnalyzer::OverlapAnalyzer(const edm::ParameterSet& cfg) :
   displacedToken_(consumes<std::vector<pat::Muon>>(cfg.getParameter<edm::InputTag>("displacedSource"))),
   min_dR_(cfg.getParameter<double>("min_dR")),
   min_dPtRelative_(cfg.getParameter<double>("min_dPtRelative")) {
+  usesResource(TFileService::kSharedResource);
 }
 
 OverlapAnalyzer::~OverlapAnalyzer() {}
