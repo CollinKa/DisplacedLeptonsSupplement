@@ -4,7 +4,7 @@
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 #include "DataFormats/PatCandidates/interface/Electron.h"
 #include "DataFormats/PatCandidates/interface/Muon.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
@@ -12,7 +12,7 @@
 #include "TTree.h"
 #include <vector>
 
-class MuonTimingAnalyzer : public edm::EDAnalyzer {
+class MuonTimingAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources> {
 public:
   explicit MuonTimingAnalyzer(const edm::ParameterSet &);
   ~MuonTimingAnalyzer() {}
