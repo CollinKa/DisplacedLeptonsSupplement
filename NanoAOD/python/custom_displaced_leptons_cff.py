@@ -1,5 +1,10 @@
 import FWCore.ParameterSet.Config as cms
 from PhysicsTools.NanoAOD.common_cff import Var
+from DisplacedLeptonsSupplement.NanoAOD.displacedMuons_cff import (
+    add_displaced_muons,
+    add_displaced_muon_timing,
+    add_displaced_muon_track_vars,
+)
 
 
 # Perigee parameter indices used by reco::TrackBase::covariance(i,j):
@@ -36,20 +41,28 @@ def DropUnneededTasks(process):
             if hasattr(process, name):
                 process.nanoTableTaskCommon.remove(getattr(process, name))
     else:
-        # Run 2
+        # Run 2 — nanoSequenceMC is a flat sequence (not nanoSequenceCommon + extras),
+        # so Tables and their MC extension sequences must both be removed from it.
+        # For data jobs nanoSequenceCommon is the fallback.
         for name in [
             "photonTables",
+            "photonMC",
             "metTables",
+            "metMC",
             "tauTables",
+            "tauMC",
             "isoTrackTables",
             "isoTrackSequence",
-            "jetTables",
+            "particleLevelTables",
+            "simpleCleanerTable",
         ]:
             if hasattr(process, name):
-                try:
-                    process.nanoSequenceCommon.remove(getattr(process, name))
-                except Exception:
-                    pass  # already excluded by era modifier
+                for seq_name in ['nanoSequenceMC', 'nanoSequenceFS', 'nanoSequenceCommon']:
+                    if hasattr(process, seq_name):
+                        try:
+                            getattr(process, seq_name).remove(getattr(process, name))
+                        except Exception:
+                            pass  # not present in this sequence or already excluded by era modifier
 
     return process
 
@@ -152,7 +165,10 @@ def AddElectronTrackVars(process):
 
 
 def PrepDisplacedLeptonsNanoAOD(process):
-    process = DropUnneededTasks(process)
+    # process = DropUnneededTasks(process)
     process = AddMuonTrackVars(process)
     process = AddElectronTrackVars(process)
+    process = add_displaced_muons(process)
+    process = add_displaced_muon_timing(process)
+    process = add_displaced_muon_track_vars(process)
     return process
