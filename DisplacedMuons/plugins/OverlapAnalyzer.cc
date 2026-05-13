@@ -34,6 +34,9 @@ class OverlapAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources> {
 
     TH1F* h_promptNoOverlap_d0;
     TH1F* h_displacedFiltered_d0;
+
+    TH1F* h_nMatchesPrompt;
+    TH1F* h_nMatchesDisplaced;
 };
 
 OverlapAnalyzer::OverlapAnalyzer(const edm::ParameterSet& cfg) :
@@ -49,8 +52,11 @@ void OverlapAnalyzer::beginJob() {
   h_prompt_d0    = fs_->make<TH1F>("prompt_d0",    "Prompt muon d_{0};d_{0} [cm];Entries",    100, 0, 10);
   h_displaced_d0 = fs_->make<TH1F>("displaced_d0", "Displaced muon d_{0};d_{0} [cm];Entries", 100, 0, 10);
 
-  h_promptNoOverlap_d0    = fs_->make<TH1F>("promptNoOverlap_d0",    "Prompt (Non-Overlapping) muon d_{0};d_{0} [cm];Entries",    50, 0, 10);
-  h_displacedFiltered_d0 = fs_->make<TH1F>("displacedFiltered_d0", "Displaced (Filtered) muon d_{0};d_{0} [cm];Entries", 50, 0, 10);
+  h_promptNoOverlap_d0   = fs_->make<TH1F>("promptNoOverlap_d0",   "Prompt (Non-Overlapping) muon d_{0};d_{0} [cm];Entries", 50, 0, 10);
+  h_displacedFiltered_d0 = fs_->make<TH1F>("displacedFiltered_d0", "Displaced (Filtered) muon d_{0};d_{0} [cm];Entries",   50, 0, 10);
+
+  h_nMatchesPrompt    = fs_->make<TH1F>("nMatchesPrompt",    "Matches per prompt muon;N matches;Entries",    10, 0, 10);
+  h_nMatchesDisplaced = fs_->make<TH1F>("nMatchesDisplaced", "Matches per displaced muon;N matches;Entries", 10, 0, 10);
 }
 
 void OverlapAnalyzer::analyze(const edm::Event& event, const edm::EventSetup& eventSetup) {
@@ -70,21 +76,32 @@ void OverlapAnalyzer::analyze(const edm::Event& event, const edm::EventSetup& ev
     h_displaced_d0->Fill(displacedMuon.dB());
   }
 
+  std::vector<int> nMatchesPrompt(promptMuons->size(), 0);
+  std::vector<int> nMatchesDisplaced(displacedMuons->size(), 0);
+
   for (unsigned int i = 0; i < promptMuons->size(); i++) {
     const pat::Muon& promptMuon = promptMuons->at(i);
-
     for (unsigned int j = 0; j < displacedMuons->size(); j++) {
       const pat::Muon& displacedMuon = displacedMuons->at(j);
-
-      double dR  = deltaR(promptMuon.eta(), promptMuon.phi(), displacedMuon.eta(), displacedMuon.phi());
+      double dR          = deltaR(promptMuon.eta(), promptMuon.phi(), displacedMuon.eta(), displacedMuon.phi());
       double dPtRelative = fabs(promptMuon.pt() - displacedMuon.pt()) / displacedMuon.pt();
-
       if (dR < min_dR_ && dPtRelative < min_dPtRelative_) {
-        h_promptNoOverlap_d0->Fill(promptMuon.dB());
-      } else {
-        h_displacedFiltered_d0->Fill(displacedMuon.dB());
+        nMatchesPrompt[i]++;
+        nMatchesDisplaced[j]++;
       }
     }
+  }
+
+  for (unsigned int i = 0; i < promptMuons->size(); i++) {
+    h_nMatchesPrompt->Fill(nMatchesPrompt[i]);
+    if (nMatchesPrompt[i] == 0)
+      h_promptNoOverlap_d0->Fill(promptMuons->at(i).dB());
+  }
+
+  for (unsigned int j = 0; j < displacedMuons->size(); j++) {
+    h_nMatchesDisplaced->Fill(nMatchesDisplaced[j]);
+    if (nMatchesDisplaced[j] == 0)
+      h_displacedFiltered_d0->Fill(displacedMuons->at(j).dB());
   }
 }
 
