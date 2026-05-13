@@ -4,6 +4,10 @@ process = cms.Process("DisplacedMuons")
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 
+process.TFileService = cms.Service("TFileService",
+    fileName = cms.string("hist.root")
+)
+
 process.MessageLogger.cerr.FwkReport.reportEvery = cms.untracked.int32(1000)
 process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(-1))
 

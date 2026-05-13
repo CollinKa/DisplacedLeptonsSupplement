@@ -3,9 +3,10 @@
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
+#include "CommonTools/UtilAlgos/interface/TFileService.h"
 #include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/Math/interface/deltaR.h"
-#include "TFile.h"
 #include "TH1F.h"
 
 class OverlapAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources> {
@@ -26,7 +27,7 @@ class OverlapAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources> {
     float min_dR_;
     float min_dPtRelative_;
 
-    TFile* histFile_;
+    edm::Service<TFileService> fs_;
     TH1F* h_prompt_d0;
     TH1F* h_displaced_d0;
 };
@@ -41,9 +42,8 @@ OverlapAnalyzer::OverlapAnalyzer(const edm::ParameterSet& cfg) :
 OverlapAnalyzer::~OverlapAnalyzer() {}
 
 void OverlapAnalyzer::beginJob() {
-  histFile_ = new TFile("hist.root", "RECREATE");
-  h_prompt_d0    = new TH1F("prompt_d0",    "Prompt muon d_{0};d_{0} [cm];Entries",    100, -10, 10);
-  h_displaced_d0 = new TH1F("displaced_d0", "Displaced muon d_{0};d_{0} [cm];Entries", 100, -10, 10);
+  h_prompt_d0    = fs_->make<TH1F>("prompt_d0",    "Prompt muon d_{0};d_{0} [cm];Entries",    100, -10, 10);
+  h_displaced_d0 = fs_->make<TH1F>("displaced_d0", "Displaced muon d_{0};d_{0} [cm];Entries", 100, -10, 10);
 }
 
 void OverlapAnalyzer::analyze(const edm::Event& event, const edm::EventSetup& eventSetup) {
@@ -69,10 +69,7 @@ void OverlapAnalyzer::analyze(const edm::Event& event, const edm::EventSetup& ev
   }
 }
 
-void OverlapAnalyzer::endJob() {
-  histFile_->Write();
-  histFile_->Close();
-}
+void OverlapAnalyzer::endJob() {}
 
 void OverlapAnalyzer::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
