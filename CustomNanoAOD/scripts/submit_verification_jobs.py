@@ -192,6 +192,7 @@ use_x509userproxy     = true
 request_memory        = 3072
 request_cpus          = 1
 request_disk          = 2097152
+max_retries           = 3
 +ProjectName          = "cms"
 
 arguments             = "$(custom_lfn) $(central_csv) $(miniaod_csv) $(output_json)"
