@@ -186,14 +186,18 @@ def compare_branches(custom_events, central_events, to_compare):
     }
 
 def _cmsrun_env():
-    # cmsRun embeds its own Python. If LCG has been sourced, PYTHONHOME points
-    # at the LCG Python installation and breaks cmsRun's embedded interpreter.
-    # Strip PYTHONHOME and any LCG entries from PYTHONPATH before the subprocess.
+    # LCG's setup.sh overwrites PATH, PYTHONPATH, and PYTHONHOME, causing cmsRun
+    # to pick up the wrong python3 binary. The condor wrapper captures the
+    # CMSSW values before sourcing LCG; restore them here so cmsRun sees a
+    # clean CMSSW-only environment. PYTHONHOME must be set explicitly: scramv1
+    # runtime doesn't set it, so without it Python falls back to its hardcoded
+    # build-time prefix which doesn't exist on the worker node.
     env = os.environ.copy()
-    env.pop("PYTHONHOME", None)
-    if "PYTHONPATH" in env:
-        paths = [p for p in env["PYTHONPATH"].split(":") if p and "sft.cern.ch" not in p]
-        env["PYTHONPATH"] = ":".join(paths)
+    saved_path = os.environ.get("CMSSW_SAVED_PATH")
+    if saved_path:
+        env["PATH"] = saved_path
+        env["PYTHONPATH"] = os.environ.get("CMSSW_SAVED_PYTHONPATH", "")
+        env["PYTHONHOME"] = os.environ["CMSSW_SAVED_PYTHONHOME"]
     return env
 
 

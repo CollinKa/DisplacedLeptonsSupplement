@@ -43,6 +43,16 @@ cd "${CMSSW_VERSION}/src/"
 scramv1 b ProjectRename
 eval "$(scramv1 runtime -sh)"
 echo "$CMSSW_BASE is the CMSSW we have on the local worker node"
+
+# Save the CMSSW Python environment before LCG overwrites PATH/PYTHONPATH/PYTHONHOME.
+# _cmsrun_env() in verify_custom_nanoaod.py uses these to give cmsRun a clean env.
+# PYTHONHOME is captured explicitly because scramv1 runtime doesn't set it — Python
+# would otherwise fall back to its hardcoded build-time prefix which doesn't exist
+# on the worker node.
+export CMSSW_SAVED_PATH="${PATH}"
+export CMSSW_SAVED_PYTHONPATH="${PYTHONPATH:-}"
+export CMSSW_SAVED_PYTHONHOME="$(python3 -c 'import sys; print(sys.prefix)')"
+
 cd "${_CONDOR_SCRATCH_DIR}"
 
 # ---------------------------------------------------------------------------
