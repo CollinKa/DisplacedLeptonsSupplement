@@ -99,6 +99,8 @@ def main():
                         help="CRAB task directory (e.g. crab_projects/ST_tW_top_UL18_customNanoAOD)")
     parser.add_argument("--dataset", required=True,
                         help="Central NanoAOD dataset in DAS (e.g. /ST_tW_top_.../NANOAODSIM)")
+    parser.add_argument("--miniaod-dataset", default=None, metavar="DATASET",
+                        help="Central MiniAOD dataset in DAS. Required to compare DisplacedMuon branches.")
     parser.add_argument("--results-dir", default="verify_results", metavar="DIR",
                         help="Directory for per-file JSON results (default: verify_results/)")
     parser.add_argument("--dry-run", action="store_true",
@@ -137,31 +139,45 @@ def main():
 
     # --- DAS query (all runs at once) ---------------------------------------
     print(f"\nQuerying DAS for {len(all_runs)} run(s) in {args.dataset}")
-    lumi_to_file = build_lumi_to_file_map(args.dataset, all_runs)
-    print(f"  {len(lumi_to_file)} (run, lumi) pairs mapped")
+    lumi_to_nano_file = build_lumi_to_file_map(args.dataset, all_runs)
+    print(f"  {len(lumi_to_nano_file)} (run, lumi) pairs mapped")
+
+    lumi_to_mini_file = {}
+    if args.miniaod_dataset:
+        print(f"\nQuerying DAS for {len(all_runs)} run(s) in {args.miniaod_dataset}")
+        lumi_to_mini_file = build_lumi_to_file_map(args.miniaod_dataset, all_runs)
+        print(f"  {len(lumi_to_mini_file)} (run, lumi) pairs mapped")
 
     # --- Build per-job specs ------------------------------------------------
     jobs = []
     for lfn, pairs in file_pairs.items():
-        central_lfns = sorted({lumi_to_file[(r, l)] for r, l in pairs if (r, l) in lumi_to_file})
-        n_missing = sum(1 for r, l in pairs if (r, l) not in lumi_to_file)
+        central_lfns = sorted({lumi_to_nano_file[(r, l)] for r, l in pairs if (r, l) in lumi_to_nano_file})
+        n_missing = sum(1 for r, l in pairs if (r, l) not in lumi_to_nano_file)
         if n_missing:
-            print(f"  WARNING: {n_missing} (run,lumi) pairs from {Path(lfn).name} not found in DAS")
+            print(f"  WARNING: {n_missing} (run,lumi) pairs from {Path(lfn).name} not found in NanoAOD DAS")
         if not central_lfns:
-            print(f"  WARNING: no central files found for {Path(lfn).name}, skipping")
+            print(f"  WARNING: no central NanoAOD files found for {Path(lfn).name}, skipping")
             continue
+
+        mini_lfns = sorted({lumi_to_mini_file[(r, l)] for r, l in pairs if (r, l) in lumi_to_mini_file})
+        if args.miniaod_dataset:
+            n_mini_missing = sum(1 for r, l in pairs if (r, l) not in lumi_to_mini_file)
+            if n_mini_missing:
+                print(f"  WARNING: {n_mini_missing} (run,lumi) pairs from {Path(lfn).name} not found in MiniAOD DAS")
+
         jobs.append({
             "custom_lfn":  lfn,
             "central_csv": ",".join(central_lfns),
+            "miniaod_csv": ",".join(mini_lfns) if mini_lfns else "-",
             "output_json": Path(lfn).stem + ".json",  # local filename; condor transfers it back
         })
 
     print(f"\n{len(jobs)} job(s) to submit")
 
     # --- Write condor submit file -------------------------------------------
-    verify_script  = HERE / "verify_nano.py"
-    wrapper_script = HERE / "run_verify.sh"
-    submit_path    = Path("verify_condor.sub")
+    verify_script  = HERE / "verify_custom_nanoaod.py"
+    wrapper_script = HERE / "condor_run_verification.sh"
+    submit_path    = Path("condor_submit_verification.sub")
 
     with open(submit_path, "w") as f:
         f.write(f"""\
@@ -173,18 +189,19 @@ output                = {logs_dir}/verify_$(Process).out
 error                 = {logs_dir}/verify_$(Process).err
 log                   = {logs_dir}/condor.log
 use_x509userproxy     = true
-request_memory        = 2048
+request_memory        = 3072
 request_cpus          = 1
 request_disk          = 2097152
 +ProjectName          = "cms"
 
-arguments             = "$(custom_lfn) $(central_csv) $(output_json)"
+arguments             = "$(custom_lfn) $(central_csv) $(miniaod_csv) $(output_json)"
 transfer_output_files = $(output_json)
 """)
         for job in jobs:
             f.write(
                 f'\ncustom_lfn  = {job["custom_lfn"]}\n'
                 f'central_csv = {job["central_csv"]}\n'
+                f'miniaod_csv = {job["miniaod_csv"]}\n'
                 f'output_json = {job["output_json"]}\n'
                 f'queue 1\n'
             )

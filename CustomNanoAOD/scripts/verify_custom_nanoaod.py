@@ -185,7 +185,9 @@ def compare_branches(custom_events, central_events, to_compare):
         },
     }
 
-def extract_mini_info(files):
+def extract_mini_info(files, cfg_path=None):
+    if cfg_path is None:
+        cfg_path = _EXTRACT_CFG
     arrays = []
     with tempfile.TemporaryDirectory() as tmpdir:
         for i, f in enumerate(files):
@@ -195,7 +197,7 @@ def extract_mini_info(files):
             print(f"\nExtracting displaced muons from: {f}")
             try:
                 subprocess.run(
-                    ["cmsRun", _EXTRACT_CFG, f"inputFiles={input_path}", f"outputFile={output_path}"],
+                    ["cmsRun", cfg_path, f"inputFiles={input_path}", f"outputFile={output_path}"],
                     check=True, capture_output=True, text=True,
                 )
             except subprocess.CalledProcessError as e:
@@ -338,6 +340,14 @@ def main():
         "custom_nanoaod",
         help="Local path or LFN (starting with /store) of the custom NanoAOD file to verify.",
     )
+    parser.add_argument(
+        "--extract-cfg", metavar="PATH", default=None,
+        help=(
+            "Path to extract_cfg.py used for MiniAOD displaced-muon extraction. "
+            "Defaults to ../python/extract_cfg.py relative to this script. "
+            "Override when running in a condor job where the script-relative path is wrong."
+        ),
+    )
     subparser = parser.add_subparsers(dest="mode", required=True)
 
     standalone = subparser.add_parser(
@@ -430,7 +440,7 @@ def main():
 
     custom_has_displaced_info = any("DisplacedMuon" in b for b in custom_branches)
     if custom_has_displaced_info and central_mini_files:
-        mini_events = extract_mini_info(central_mini_files)
+        mini_events = extract_mini_info(central_mini_files, cfg_path=args.extract_cfg)
         results["mini_comparison"] = compare_branches(custom_events, mini_events, DISPLACED_BRANCHES)
     elif custom_has_displaced_info:
         print("  WARNING: custom NanoAOD has displaced muon branches but no MiniAOD was provided — skipping displaced muon comparison")
