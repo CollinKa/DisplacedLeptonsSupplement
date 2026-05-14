@@ -52,6 +52,7 @@ echo "$CMSSW_BASE is the CMSSW we have on the local worker node"
 export CMSSW_SAVED_PATH="${PATH}"
 export CMSSW_SAVED_PYTHONPATH="${PYTHONPATH:-}"
 export CMSSW_SAVED_PYTHONHOME="$(python3 -c 'import sys; print(sys.prefix)')"
+export CMSSW_SAVED_LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
 
 cd "${_CONDOR_SCRATCH_DIR}"
 

@@ -198,6 +198,7 @@ def _cmsrun_env():
         env["PATH"] = saved_path
         env["PYTHONPATH"] = os.environ.get("CMSSW_SAVED_PYTHONPATH", "")
         env["PYTHONHOME"] = os.environ["CMSSW_SAVED_PYTHONHOME"]
+        env["LD_LIBRARY_PATH"] = os.environ.get("CMSSW_SAVED_LD_LIBRARY_PATH", "")
     return env
 
 
