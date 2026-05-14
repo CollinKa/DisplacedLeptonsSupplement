@@ -185,6 +185,18 @@ def compare_branches(custom_events, central_events, to_compare):
         },
     }
 
+def _cmsrun_env():
+    # cmsRun embeds its own Python. If LCG has been sourced, PYTHONHOME points
+    # at the LCG Python installation and breaks cmsRun's embedded interpreter.
+    # Strip PYTHONHOME and any LCG entries from PYTHONPATH before the subprocess.
+    env = os.environ.copy()
+    env.pop("PYTHONHOME", None)
+    if "PYTHONPATH" in env:
+        paths = [p for p in env["PYTHONPATH"].split(":") if p and "sft.cern.ch" not in p]
+        env["PYTHONPATH"] = ":".join(paths)
+    return env
+
+
 def extract_mini_info(files, cfg_path=None):
     if cfg_path is None:
         cfg_path = _EXTRACT_CFG
@@ -199,6 +211,7 @@ def extract_mini_info(files, cfg_path=None):
                 subprocess.run(
                     ["cmsRun", cfg_path, f"inputFiles={input_path}", f"outputFile={output_path}"],
                     check=True, capture_output=True, text=True,
+                    env=_cmsrun_env(),
                 )
             except subprocess.CalledProcessError as e:
                 print(e.stderr)
