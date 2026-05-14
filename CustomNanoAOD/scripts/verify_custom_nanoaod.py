@@ -310,6 +310,14 @@ def main():
         "--verbose", "-v", action="store_true",
         help="Print individual branch names and per-event mismatch details. Without this flag only failures are shown.",
     )
+    common.add_argument(
+        "--extract-cfg", metavar="PATH", default=None,
+        help=(
+            "Path to extract_cfg.py used for MiniAOD displaced-muon extraction. "
+            "Defaults to ../python/extract_cfg.py relative to this script. "
+            "Override when running in a condor job where the script-relative path is wrong."
+        ),
+    )
 
     parser = argparse.ArgumentParser(
         description=(
@@ -339,14 +347,6 @@ def main():
     parser.add_argument(
         "custom_nanoaod",
         help="Local path or LFN (starting with /store) of the custom NanoAOD file to verify.",
-    )
-    parser.add_argument(
-        "--extract-cfg", metavar="PATH", default=None,
-        help=(
-            "Path to extract_cfg.py used for MiniAOD displaced-muon extraction. "
-            "Defaults to ../python/extract_cfg.py relative to this script. "
-            "Override when running in a condor job where the script-relative path is wrong."
-        ),
     )
     subparser = parser.add_subparsers(dest="mode", required=True)
 
