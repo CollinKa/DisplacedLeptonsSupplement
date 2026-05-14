@@ -295,21 +295,92 @@ def save_results_json(path, results):
 
 def main():
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--branches", nargs="+", default=DEFAULT_BRANCHES)
-    common.add_argument("--output-json")
-    common.add_argument("--verbose", "-v", action="store_true")
+    common.add_argument(
+        "--branches", nargs="+", default=DEFAULT_BRANCHES,
+        metavar="BRANCH",
+        help="NanoAOD branches to compare against central. Defaults to a standard set of muon/electron branches.",
+    )
+    common.add_argument(
+        "--output-json", metavar="PATH",
+        help="Write full results (branch presence, comparison results, error details) as JSON to PATH.",
+    )
+    common.add_argument(
+        "--verbose", "-v", action="store_true",
+        help="Print individual branch names and per-event mismatch details. Without this flag only failures are shown.",
+    )
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("custom_nanoaod", help="Path of LFN of custom NanoAOD file")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Verify a custom NanoAOD file against central NanoAOD and optionally against MiniAOD.\n\n"
+            "Checks that branches present in both files have matching values event-by-event, "
+            "and reports any extra or missing collections. If the custom file contains DisplacedMuon "
+            "branches and MiniAOD is provided, those branches are also compared against values "
+            "extracted directly from MiniAOD via cmsRun."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  # Look up central files automatically via DAS\n"
+            "  verify_custom_nanoaod.py /path/to/custom.root standalone \\\n"
+            "      --nanoaod-dataset /Dataset/Run3/NANOAOD \\\n"
+            "      --miniaod-dataset /Dataset/Run3/MINIAOD\n\n"
+            "  # Supply central files directly (e.g. from a batch job)\n"
+            "  verify_custom_nanoaod.py /path/to/custom.root batch \\\n"
+            "      --nanoaod-filenames /store/data/.../nano.root \\\n"
+            "      --miniaod-filenames /store/data/.../mini.root\n\n"
+            "  # Verbose output + save JSON results\n"
+            "  verify_custom_nanoaod.py /path/to/custom.root standalone \\\n"
+            "      --nanoaod-dataset /Dataset/Run3/NANOAOD \\\n"
+            "      --verbose --output-json results.json"
+        ),
+    )
+    parser.add_argument(
+        "custom_nanoaod",
+        help="Local path or LFN (starting with /store) of the custom NanoAOD file to verify.",
+    )
     subparser = parser.add_subparsers(dest="mode", required=True)
 
-    standalone = subparser.add_parser("standalone", parents=[common])
-    standalone.add_argument("--nanoaod-dataset", required=True)
-    standalone.add_argument("--miniaod-dataset")
+    standalone = subparser.add_parser(
+        "standalone",
+        parents=[common],
+        help="Look up central files automatically from DAS using the provided dataset names.",
+        description=(
+            "Automatically queries DAS to find the central NanoAOD (and optionally MiniAOD) files "
+            "that contain the same run/lumi sections as the custom NanoAOD, then runs the comparison."
+        ),
+    )
+    standalone.add_argument(
+        "--nanoaod-dataset", required=True, metavar="DATASET",
+        help="DAS dataset path for the central NanoAOD (e.g. /Dataset/Run3/NANOAOD).",
+    )
+    standalone.add_argument(
+        "--miniaod-dataset", metavar="DATASET",
+        help=(
+            "DAS dataset path for the central MiniAOD (e.g. /Dataset/Run3/MINIAOD). "
+            "Required to compare DisplacedMuon branches, which are not present in central NanoAOD."
+        ),
+    )
 
-    batch = subparser.add_parser("batch", parents=[common])
-    batch.add_argument("--nanoaod-filenames", nargs="+", required=True)
-    batch.add_argument("--miniaod-filenames", nargs="+")
+    batch = subparser.add_parser(
+        "batch",
+        parents=[common],
+        help="Supply central file paths directly, bypassing DAS lookup.",
+        description=(
+            "Use when the central files are already known (e.g. passed in from a batch job). "
+            "Skips the DAS query and loads the provided files directly."
+        ),
+    )
+    batch.add_argument(
+        "--nanoaod-filenames", nargs="+", required=True, metavar="FILE",
+        help="One or more central NanoAOD file paths or LFNs.",
+    )
+    batch.add_argument(
+        "--miniaod-filenames", nargs="+", metavar="FILE",
+        help=(
+            "One or more central MiniAOD file paths or LFNs. "
+            "Required to compare DisplacedMuon branches."
+        ),
+    )
 
     args = parser.parse_args()
 
