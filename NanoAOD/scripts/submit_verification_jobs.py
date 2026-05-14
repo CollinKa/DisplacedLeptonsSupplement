@@ -4,7 +4,7 @@ Get CRAB output file list, map each to its central NanoAOD files via DAS,
 and submit one Condor job per custom file to verify it.
 
 Usage:
-    python submit_verify.py crab_projects/ST_tW_top_UL18_customNanoAOD \\
+    python submit_verification_jobs.py crab_projects/ST_tW_top_UL18_customNanoAOD \\
         --dataset /ST_tW_top_5f_.../NANOAODSIM
 
     # Write submit file without submitting:
