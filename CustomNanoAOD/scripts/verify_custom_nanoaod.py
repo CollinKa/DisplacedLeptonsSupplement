@@ -436,7 +436,7 @@ def main():
 
     # TODO: Can we narrow this down to just the events in custom nanoaod?
     central_events = (
-        ak.accumulate(central_file_events)
+        ak.concatenate(central_file_events)
         if len(central_file_events) > 1
         else central_file_events[0]
     )
