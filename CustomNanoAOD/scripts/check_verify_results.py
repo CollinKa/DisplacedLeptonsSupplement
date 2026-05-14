@@ -1,16 +1,34 @@
 #!/usr/bin/env python3
 """
-Summarize verify_nano.py JSON results across all datasets.
+Summarize verify_custom_nanoaod.py JSON results across all datasets.
 
 Usage:
     python check_verify_results.py
     python check_verify_results.py --results-dir verify_results/
-    python check_verify_results.py --dataset ST_tW_top_UL18_customNanoAOD
+    python check_verify_results.py --dataset DoubleMuon_Run2022C_customNanoAOD
 """
 
 import argparse
 import json
 from pathlib import Path
+
+
+def _comparison_status(comparison):
+    """Return (all_passed, n_failed_branches, n_not_in_central)."""
+    branches = comparison.get("branches", {})
+    n_failed = sum(1 for b in branches.values() if b.get("status") == "fail")
+    n_not_in_central = comparison.get("n_events_not_in_central", 0)
+    return n_failed == 0, n_failed, n_not_in_central
+
+
+def _print_comparison_failures(label, comparison, indent="    "):
+    branches = comparison.get("branches", {})
+    for branch, info in branches.items():
+        if info.get("status") != "fail":
+            continue
+        print(f"{indent}FAIL  {branch}: {info['n_mismatches']} mismatch(es)")
+        for err in info.get("errors", []):
+            print(f"{indent}      {err}")
 
 
 def main():
@@ -35,9 +53,7 @@ def main():
         print("No result files found.")
         return
 
-    n_pass = 0
-    n_fail = 0
-    n_warn = 0
+    n_pass = n_fail = n_warn = 0
     failures = []
     warnings = []
 
@@ -49,45 +65,52 @@ def main():
             print(f"WARNING: could not read {path}: {e}")
             continue
 
-        status = result.get("status", "UNKNOWN")
-        n_not_found = result.get("n_not_in_central", 0)
         label = f"{path.parent.name}/{path.stem}"
+        nano = result.get("nano_comparison", {})
+        mini = result.get("mini_comparison")
 
-        if status == "PASS":
-            n_pass += 1
+        nano_ok, nano_n_fail, nano_missing = _comparison_status(nano)
+        mini_ok, mini_n_fail, mini_missing = _comparison_status(mini) if mini else (True, 0, 0)
+
+        all_ok = nano_ok and mini_ok
+        any_missing = nano_missing + mini_missing
+
+        if all_ok:
+            if any_missing:
+                n_warn += 1
+                warnings.append((label, nano_missing, mini_missing))
+            else:
+                n_pass += 1
         else:
             n_fail += 1
-            failed_branches = {
-                b: info for b, info in result.get("branches", {}).items()
-                if not info.get("ok", True)
-            }
-            failures.append((label, failed_branches, n_not_found))
+            failures.append((label, nano, mini, nano_missing, mini_missing))
 
-        if n_not_found > 0 and status == "PASS":
-            n_warn += 1
-            warnings.append((label, n_not_found))
-
-    # --- Report ---
-    total = n_pass + n_fail
+    total = n_pass + n_fail + n_warn
     print(f"\n{'='*65}")
     print(f"RESULTS: {total} file(s) checked — {n_pass} PASS, {n_fail} FAIL, {n_warn} WARN")
     print(f"{'='*65}")
 
     if failures:
         print(f"\nFAILURES ({n_fail}):")
-        for label, branches, n_not_found in failures:
+        for label, nano, mini, nano_missing, mini_missing in failures:
             print(f"\n  {label}")
-            if n_not_found:
-                print(f"    WARN: {n_not_found} events not found in central file")
-            for branch, info in branches.items():
-                print(f"    FAIL  {branch}: {info['mismatches']} mismatch(es)")
-                for ex in info.get("examples", []):
-                    print(f"          {ex}")
+            if nano_missing:
+                print(f"    {nano_missing} events not found in central NanoAOD")
+            _print_comparison_failures("NanoAOD", nano)
+            if mini:
+                if mini_missing:
+                    print(f"    {mini_missing} events not found in MiniAOD")
+                _print_comparison_failures("MiniAOD displaced muons", mini)
 
     if warnings:
-        print(f"\nWARNINGS — passed but some events not found centrally ({n_warn}):")
-        for label, n_not_found in warnings:
-            print(f"  {label}: {n_not_found} events not found in central file")
+        print(f"\nWARNINGS — passed but some events not found ({n_warn}):")
+        for label, nano_missing, mini_missing in warnings:
+            parts = []
+            if nano_missing:
+                parts.append(f"{nano_missing} not in central NanoAOD")
+            if mini_missing:
+                parts.append(f"{mini_missing} not in MiniAOD")
+            print(f"  {label}: {', '.join(parts)}")
 
     if not failures and not warnings:
         print("\nAll files passed.")
