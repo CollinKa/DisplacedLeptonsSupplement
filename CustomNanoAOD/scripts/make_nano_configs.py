@@ -37,7 +37,7 @@ import sys
 from urllib.parse import urlparse
 
 CUSTOM_CUSTOMIZE = (
-    "DisplacedLeptonsSupplement/NanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsNanoAOD"
+    "DisplacedLeptonsSupplement/CustomNanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsNanoAOD"
 )
 CUSTOM_COMMAND = "process.MessageLogger.cerr.FwkReport.reportEvery = 1000"
 
@@ -51,7 +51,7 @@ GOLDEN_JSONS = {
         "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_JSON.txt"
     ),
     2018: (
-        "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt"
+        "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt"
     ),
     # Run3 — update these paths once the golden JSONs are finalised:
     2022: "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions22/Cert_Collisions2022_355100_362760_Golden.json",
