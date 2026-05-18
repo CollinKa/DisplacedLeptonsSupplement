@@ -39,7 +39,10 @@ from urllib.parse import urlparse
 CUSTOM_CUSTOMIZE = (
     "DisplacedLeptonsSupplement/NanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsNanoAOD"
 )
-CUSTOM_COMMAND = "process.MessageLogger.cerr.FwkReport.reportEvery = 1000"
+CUSTOM_COMMAND = (
+    "process.add_(cms.Service('InitRootHandlers', EnableIMT = cms.untracked.bool(False))); "
+    "process.MessageLogger.cerr.FwkReport.reportEvery = 1000"
+)
 
 # Golden lumi JSON paths for each run year.
 # Run2 UL paths are on AFS; update Run3 entries when known.
