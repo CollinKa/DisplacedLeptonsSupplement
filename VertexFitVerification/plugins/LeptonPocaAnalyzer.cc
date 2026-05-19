@@ -65,8 +65,10 @@ private:
     float coeff_d1_, coeff_d2_;
     float coeff_e1_, coeff_e2_;
     int   n_iter_;
-    float dphi_trk1_[6];   // delta phi for G (trk1) at each iteration
-    float dphi_trk2_[6];   // delta phi for H (trk2) at each iteration
+    float dphi_trk1_[6];
+    float dphi_trk2_[6];
+    float A11_[6], A12_[6], A21_[6], A22_[6];
+    float z1_[6], z2_[6];
 };
 
 LeptonPocaAnalyzer::LeptonPocaAnalyzer(const edm::ParameterSet& cfg)
@@ -126,6 +128,12 @@ void LeptonPocaAnalyzer::beginJob() {
     tree_->Branch("n_iter",    &n_iter_);
     tree_->Branch("dphi_trk1", dphi_trk1_, "dphi_trk1[6]/F");
     tree_->Branch("dphi_trk2", dphi_trk2_, "dphi_trk2[6]/F");
+    tree_->Branch("A11", A11_, "A11[6]/F");
+    tree_->Branch("A12", A12_, "A12[6]/F");
+    tree_->Branch("A21", A21_, "A21[6]/F");
+    tree_->Branch("A22", A22_, "A22[6]/F");
+    tree_->Branch("z1",  z1_,  "z1[6]/F");
+    tree_->Branch("z2",  z2_,  "z2[6]/F");
 }
 
 void LeptonPocaAnalyzer::analyze(const edm::Event& event, const edm::EventSetup& setup) {
@@ -185,6 +193,9 @@ void LeptonPocaAnalyzer::fillPair(const reco::Track& trk1, int pdgId1,
     n_iter_ = 0;
     std::fill(dphi_trk1_, dphi_trk1_ + 6, 0.f);
     std::fill(dphi_trk2_, dphi_trk2_ + 6, 0.f);
+    std::fill(A11_, A11_ + 6, 0.f);  std::fill(A12_, A12_ + 6, 0.f);
+    std::fill(A21_, A21_ + 6, 0.f);  std::fill(A22_, A22_ + 6, 0.f);
+    std::fill(z1_,  z1_  + 6, 0.f);  std::fill(z2_,  z2_  + 6, 0.f);
 
     GlobalPoint pt1, pt2;
     if (useCustomPoca_) {
@@ -290,9 +301,14 @@ bool LeptonPocaAnalyzer::customCalculate(const GlobalTrajectoryParameters& gtp1,
         dH = (z1 * A22 - z2 * A12) * detaI;
         dG = (z2 * A11 - z1 * A21) * detaI;
 
-        // Save delta phis before any early-exit checks, so the array always reflects
-        // what was computed even when the iteration fails.
+        // Save all intermediates before any early-exit checks.
         if (n_iter_ < 6) {
+            A11_[n_iter_] = static_cast<float>(A11);
+            A12_[n_iter_] = static_cast<float>(A12);
+            A21_[n_iter_] = static_cast<float>(A21);
+            A22_[n_iter_] = static_cast<float>(A22);
+            z1_[n_iter_]  = static_cast<float>(z1);
+            z2_[n_iter_]  = static_cast<float>(z2);
             dphi_trk1_[n_iter_] = static_cast<float>(dG);
             dphi_trk2_[n_iter_] = static_cast<float>(dH);
         }
