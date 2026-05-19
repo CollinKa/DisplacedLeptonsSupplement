@@ -53,12 +53,13 @@ public:
 
         auto table = std::make_unique<nanoaod::FlatTable>(leptons->size(), name_, false, true);
 #ifdef CMSSW_LEGACY_NANO_API
-        // CMSSW 10_2_x: addColumn requires explicit ColumnType argument
-        table->addColumn("bField_z", bField_z,
+        // CMSSW 10_2_x: T cannot be deduced; must be given explicitly.
+        // The template keyword is required inside a template class method.
+        table->template addColumn<float>("bField_z", bField_z,
             "z component of magnetic field at track ref. point [GeV/cm]",
             nanoaod::FlatTable::FloatColumn, 10);
 #else
-        // CMSSW 12+ : ColumnType is deduced from the vector element type
+        // CMSSW 12+: T is deduced from the vector element type, no ColumnType needed.
         table->addColumn("bField_z", bField_z,
             "z component of magnetic field at track ref. point [GeV/cm]", 10);
 #endif
