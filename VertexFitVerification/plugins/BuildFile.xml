@@ -1,0 +1,11 @@
+<use name="FWCore/Framework"/>
+<use name="FWCore/ParameterSet"/>
+<use name="DataFormats/PatCandidates"/>
+<use name="TrackingTools/PatternTools"/>
+<use name="TrackingTools/TrajectoryParametrization"/>
+<use name="DataFormats/GeometryVector"/>
+<use name="MagneticField/Engine"/>
+<use name="MagneticField/Records"/>
+<use name="CommonTools/UtilAlgos"/>
+<use name="rootcore"/>
+<flags EDM_PLUGIN="1"/>
