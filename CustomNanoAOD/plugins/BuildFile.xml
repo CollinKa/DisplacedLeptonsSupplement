@@ -9,3 +9,5 @@
 <use name="CommonTools/Utils"/>
 <use name="rootcore"/>
 <flags EDM_PLUGIN="1"/>
+<!-- Uncomment for CMSSW 10_2_x (pre-UL Run 2); leave commented for CMSSW 12+  -->
+<!-- <flags CPPDEFINES="CMSSW_LEGACY_NANO_API"/>                                 -->
