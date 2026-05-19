@@ -71,20 +71,20 @@ def add_displaced_muon_timing(process):
 
 def add_displaced_muon_track_vars(process):
     t = process.displacedMuonTable.variables
-    t.innerTrack_vx = Var("? innerTrack().isNonnull() ? innerTrack().vx() : -99",
+    t.track_vx = Var("? innerTrack().isNonnull() ? innerTrack().vx() : -99",
         float, doc="inner track perigee reference point x [cm]", precision=-1)
-    t.innerTrack_vy = Var("? innerTrack().isNonnull() ? innerTrack().vy() : -99",
+    t.track_vy = Var("? innerTrack().isNonnull() ? innerTrack().vy() : -99",
         float, doc="inner track perigee reference point y [cm]", precision=-1)
-    t.innerTrack_vz = Var("? innerTrack().isNonnull() ? innerTrack().vz() : -99",
+    t.track_vz = Var("? innerTrack().isNonnull() ? innerTrack().vz() : -99",
         float, doc="inner track perigee reference point z [cm]", precision=-1)
-    t.innerTrack_qoverp = Var("? innerTrack().isNonnull() ? innerTrack().qoverp() : -99",
+    t.track_qoverp = Var("? innerTrack().isNonnull() ? innerTrack().qoverp() : -99",
         float, doc="inner track q/p [1/GeV]", precision=-1)
-    t.innerTrack_lambda = Var("? innerTrack().isNonnull() ? innerTrack().lambda() : -99",
+    t.track_lambda = Var("? innerTrack().isNonnull() ? innerTrack().lambda() : -99",
         float, doc="inner track lambda = pi/2 - theta [rad]", precision=-1)
-    t.innerTrack_dsz = Var("? innerTrack().isNonnull() ? innerTrack().dsz() : -99",
+    t.track_dsz = Var("? innerTrack().isNonnull() ? innerTrack().dsz() : -99",
         float, doc="inner track dsz = dz*cos(lambda) [cm]", precision=-1)
     for i, j in _COV_INDICES:
-        name = "innerTrack_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
+        name = "track_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
         setattr(t, name, Var(
             "? innerTrack().isNonnull() ? innerTrack().covariance({},{}) : -99".format(i, j),
             float,

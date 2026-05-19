@@ -6,6 +6,8 @@ from PhysicsTools.NanoAOD.common_cff import Var
     # add_displaced_muon_track_vars,
 # )
 
+CUSTOM_NANO_VERSION = 1
+
 
 # Perigee parameter indices used by reco::TrackBase::covariance(i,j):
 #   0 = q/p
@@ -78,30 +80,30 @@ def AddMuonTrackVars(process):
     t = process.muonTable.variables
 
     # Reference point
-    t.innerTrack_vx = Var(
+    t.track_vx = Var(
         "? innerTrack().isNonnull() ? innerTrack().vx() : -99",
         float, doc="inner track perigee reference point x [cm]", precision=-1)
-    t.innerTrack_vy = Var(
+    t.track_vy = Var(
         "? innerTrack().isNonnull() ? innerTrack().vy() : -99",
         float, doc="inner track perigee reference point y [cm]", precision=-1)
-    t.innerTrack_vz = Var(
+    t.track_vz = Var(
         "? innerTrack().isNonnull() ? innerTrack().vz() : -99",
         float, doc="inner track perigee reference point z [cm]", precision=-1)
 
     # Remaining perigee parameters (dxy/dz already in standard NanoAOD)
-    t.innerTrack_qoverp = Var(
+    t.track_qoverp = Var(
         "? innerTrack().isNonnull() ? innerTrack().qoverp() : -99",
         float, doc="inner track q/p [1/GeV]", precision=-1)
-    t.innerTrack_lambda = Var(
+    t.track_lambda = Var(
         "? innerTrack().isNonnull() ? innerTrack().lambda() : -99",
         float, doc="inner track lambda = pi/2 - theta [rad]", precision=-1)
-    t.innerTrack_dsz = Var(
+    t.track_dsz = Var(
         "? innerTrack().isNonnull() ? innerTrack().dsz() : -99",
         float, doc="inner track dsz = dz*cos(lambda) [cm]", precision=-1)
 
     # Full 5x5 covariance (upper triangle, 15 elements)
     for i, j in _COV_INDICES:
-        name = "innerTrack_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
+        name = "track_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
         setattr(t, name, Var(
             "? innerTrack().isNonnull() ? innerTrack().covariance({},{}) : -99".format(i, j),
             float,
@@ -128,30 +130,30 @@ def AddElectronTrackVars(process):
     t = process.electronTable.variables
 
     # Reference point
-    t.gsfTrack_vx = Var(
+    t.track_vx = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().vx() : -99",
         float, doc="GSF track perigee reference point x [cm]", precision=-1)
-    t.gsfTrack_vy = Var(
+    t.track_vy = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().vy() : -99",
         float, doc="GSF track perigee reference point y [cm]", precision=-1)
-    t.gsfTrack_vz = Var(
+    t.track_vz = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().vz() : -99",
         float, doc="GSF track perigee reference point z [cm]", precision=-1)
 
     # Remaining perigee parameters
-    t.gsfTrack_qoverp = Var(
+    t.track_qoverp = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().qoverp() : -99",
         float, doc="GSF track q/p [1/GeV]", precision=-1)
-    t.gsfTrack_lambda = Var(
+    t.track_lambda = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().lambda() : -99",
         float, doc="GSF track lambda = pi/2 - theta [rad]", precision=-1)
-    t.gsfTrack_dsz = Var(
+    t.track_dsz = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().dsz() : -99",
         float, doc="GSF track dsz = dz*cos(lambda) [cm]", precision=-1)
 
     # Full 5x5 covariance (upper triangle, 15 elements)
     for i, j in _COV_INDICES:
-        name = "gsfTrack_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
+        name = "track_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
         setattr(t, name, Var(
             "? gsfTrack().isNonnull() ? gsfTrack().covariance({},{}) : -99".format(i, j),
             float,
@@ -168,4 +170,5 @@ def PrepDisplacedLeptonsNanoAOD(process):
     # process = add_displaced_muons(process)
     # process = add_displaced_muon_timing(process)
     # process = add_displaced_muon_track_vars(process)
+    process.nanoMetadata.strings.customNanoVersion = cms.string(str(CUSTOM_NANO_VERSION))
     return process
