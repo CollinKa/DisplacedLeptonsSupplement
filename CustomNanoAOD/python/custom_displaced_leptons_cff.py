@@ -90,7 +90,9 @@ def AddMuonTrackVars(process):
         "? innerTrack().isNonnull() ? innerTrack().vz() : -99",
         float, doc="inner track perigee reference point z [cm]", precision=-1)
 
-    # Remaining perigee parameters (dxy/dz already in standard NanoAOD)
+    # All 5 Perigee parameters at the track reference point.
+    # NB: standard NanoAOD Muon_dxy uses dB('PV2D') (PV-relative); we store
+    # the origin-relative Perigee parameter 3 needed by the vertex fitter.
     t.track_qoverp = Var(
         "? innerTrack().isNonnull() ? innerTrack().qoverp() : -99",
         float, doc="inner track q/p [1/GeV]", precision=-1)
@@ -100,6 +102,9 @@ def AddMuonTrackVars(process):
     t.track_phi = Var(
         "? innerTrack().isNonnull() ? innerTrack().phi() : -99",
         float, doc="inner track perigee phi [rad]", precision=-1)
+    t.track_dxy = Var(
+        "? innerTrack().isNonnull() ? innerTrack().dxy() : -99",
+        float, doc="inner track Perigee dxy (origin-relative) [cm]", precision=-1)
     t.track_dsz = Var(
         "? innerTrack().isNonnull() ? innerTrack().dsz() : -99",
         float, doc="inner track dsz = dz*cos(lambda) [cm]", precision=-1)
@@ -143,7 +148,9 @@ def AddElectronTrackVars(process):
         "? gsfTrack().isNonnull() ? gsfTrack().vz() : -99",
         float, doc="GSF track perigee reference point z [cm]", precision=-1)
 
-    # Remaining perigee parameters
+    # All 5 Perigee parameters at the track reference point.
+    # NB: standard NanoAOD Electron_dxy uses dB('PV2D') (PV-relative); we store
+    # the origin-relative Perigee parameter 3 needed by the vertex fitter.
     t.track_qoverp = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().qoverp() : -99",
         float, doc="GSF track q/p [1/GeV]", precision=-1)
@@ -153,6 +160,9 @@ def AddElectronTrackVars(process):
     t.track_phi = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().phi() : -99",
         float, doc="GSF track perigee phi [rad]", precision=-1)
+    t.track_dxy = Var(
+        "? gsfTrack().isNonnull() ? gsfTrack().dxy() : -99",
+        float, doc="GSF track Perigee dxy (origin-relative) [cm]", precision=-1)
     t.track_dsz = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().dsz() : -99",
         float, doc="GSF track dsz = dz*cos(lambda) [cm]", precision=-1)
@@ -173,31 +183,27 @@ def AddBFieldZ(process):
     """
     Add bField_z (z-component of the magnetic field at the track reference
     point, in GeV/cm) to the muon and electron tables via
-    PATLeptonTimeLifeInfoProducer. This matches the value used by CMSSW's
-    TwoTrackMinimumDistanceHelixHelix for the helix radius calculation.
+    MuonBFieldTableProducer / ElectronBFieldTableProducer.
+
+    Uses the ESHandle API so it compiles under CMSSW 10_2_x and later.
     """
-    from PhysicsTools.NanoAOD.leptonTimeLifeInfo_common_cff import (
-        addMuonTimeLifeInfoTask,
-        addElectronTimeLifeInfoTask,
+    process.muonBFieldTable = cms.EDProducer("MuonBFieldTableProducer",
+        src  = process.muonTable.src,
+        name = process.muonTable.name,
+    )
+    process.electronBFieldTable = cms.EDProducer("ElectronBFieldTableProducer",
+        src  = process.electronTable.src,
+        name = process.electronTable.name,
     )
 
-    addMuonTimeLifeInfoTask(process)
-    addElectronTimeLifeInfoTask(process)
-
-    for producer, table in [
-        ("muonTimeLifeInfos",     "muonTimeLifeInfoTable"),
-        ("electronTimeLifeInfos", "electronTimeLifeInfoTable"),
-    ]:
-        var = Var(
-            "?hasTrack()?bField_z:0", float,
-            doc="z component of magnetic field at track ref. point [GeV/cm]",
-            precision=10,
-        )
-        var.src = cms.InputTag(producer)
-        getattr(process, table).externalTypedVariables = cms.PSet(
-            getattr(process, table).externalTypedVariables,
-            bField_z=var,
-        )
+    if hasattr(process, 'nanoTableTaskCommon'):
+        # Run 3: task-based scheduling
+        process.nanoTableTaskCommon.add(process.muonBFieldTable)
+        process.nanoTableTaskCommon.add(process.electronBFieldTable)
+    else:
+        # Run 2: sequence-based scheduling
+        process.nanoSequenceCommon += process.muonBFieldTable
+        process.nanoSequenceCommon += process.electronBFieldTable
 
     return process
 
