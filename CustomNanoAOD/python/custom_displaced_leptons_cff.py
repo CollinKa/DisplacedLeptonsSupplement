@@ -97,6 +97,9 @@ def AddMuonTrackVars(process):
     t.track_lambda = Var(
         "? innerTrack().isNonnull() ? innerTrack().lambda() : -99",
         float, doc="inner track lambda = pi/2 - theta [rad]", precision=-1)
+    t.track_phi = Var(
+        "? innerTrack().isNonnull() ? innerTrack().phi() : -99",
+        float, doc="inner track perigee phi [rad]", precision=-1)
     t.track_dsz = Var(
         "? innerTrack().isNonnull() ? innerTrack().dsz() : -99",
         float, doc="inner track dsz = dz*cos(lambda) [cm]", precision=-1)
@@ -147,6 +150,9 @@ def AddElectronTrackVars(process):
     t.track_lambda = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().lambda() : -99",
         float, doc="GSF track lambda = pi/2 - theta [rad]", precision=-1)
+    t.track_phi = Var(
+        "? gsfTrack().isNonnull() ? gsfTrack().phi() : -99",
+        float, doc="GSF track perigee phi [rad]", precision=-1)
     t.track_dsz = Var(
         "? gsfTrack().isNonnull() ? gsfTrack().dsz() : -99",
         float, doc="GSF track dsz = dz*cos(lambda) [cm]", precision=-1)
@@ -163,10 +169,44 @@ def AddElectronTrackVars(process):
     return process
 
 
+def AddBFieldZ(process):
+    """
+    Add bField_z (z-component of the magnetic field at the track reference
+    point, in GeV/cm) to the muon and electron tables via
+    PATLeptonTimeLifeInfoProducer. This matches the value used by CMSSW's
+    TwoTrackMinimumDistanceHelixHelix for the helix radius calculation.
+    """
+    from PhysicsTools.NanoAOD.leptonTimeLifeInfo_common_cff import (
+        addMuonTimeLifeInfoTask,
+        addElectronTimeLifeInfoTask,
+    )
+
+    addMuonTimeLifeInfoTask(process)
+    addElectronTimeLifeInfoTask(process)
+
+    for producer, table in [
+        ("muonTimeLifeInfos",     "muonTimeLifeInfoTable"),
+        ("electronTimeLifeInfos", "electronTimeLifeInfoTable"),
+    ]:
+        var = Var(
+            "?hasTrack()?bField_z:0", float,
+            doc="z component of magnetic field at track ref. point [GeV/cm]",
+            precision=10,
+        )
+        var.src = cms.InputTag(producer)
+        getattr(process, table).externalTypedVariables = cms.PSet(
+            getattr(process, table).externalTypedVariables,
+            bField_z=var,
+        )
+
+    return process
+
+
 def PrepDisplacedLeptonsNanoAOD(process):
     # process = DropUnneededTasks(process)
     process = AddMuonTrackVars(process)
     process = AddElectronTrackVars(process)
+    process = AddBFieldZ(process)
     # process = add_displaced_muons(process)
     # process = add_displaced_muon_timing(process)
     # process = add_displaced_muon_track_vars(process)
