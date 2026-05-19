@@ -2,6 +2,9 @@ import FWCore.ParameterSet.Config as cms
 from FWCore.ParameterSet.VarParsing import VarParsing
 
 options = VarParsing("analysis")
+options.register("useCustomPoca", False,
+    VarParsing.multiplicity.singleton, VarParsing.varType.bool,
+    "Use custom instrumented POCA implementation instead of TwoTrackMinimumDistanceHelixHelix")
 options.register("globalTag", "94X_dataRun2_v11",
     VarParsing.multiplicity.singleton, VarParsing.varType.string,
     "Global tag — must match the dataset era")
@@ -28,9 +31,10 @@ process.TFileService = cms.Service("TFileService",
 )
 
 process.leptonPoca = cms.EDAnalyzer("LeptonPocaAnalyzer",
-    muons     = cms.InputTag("slimmedMuons"),
-    electrons = cms.InputTag("slimmedElectrons"),
-    ptCut     = cms.double(5.0),
+    muons          = cms.InputTag("slimmedMuons"),
+    electrons      = cms.InputTag("slimmedElectrons"),
+    ptCut          = cms.double(5.0),
+    useCustomPoca  = cms.bool(options.useCustomPoca),
 )
 
 process.p = cms.Path(process.leptonPoca)
