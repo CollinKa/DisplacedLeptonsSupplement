@@ -53,8 +53,10 @@ private:
     int trk1_pdgId_, trk2_pdgId_;
     float trk1_pt_, trk1_eta_, trk1_phi_, trk1_lambda_, trk1_charge_, trk1_bField_z_;
     float trk1_vx_, trk1_vy_, trk1_vz_;
+    double trk1_px_, trk1_py_, trk1_pz_;
     float trk2_pt_, trk2_eta_, trk2_phi_, trk2_lambda_, trk2_charge_, trk2_bField_z_;
     float trk2_vx_, trk2_vy_, trk2_vz_;
+    double trk2_px_, trk2_py_, trk2_pz_;
     float poca1_x_, poca1_y_, poca1_z_;
     float poca2_x_, poca2_y_, poca2_z_;
     int poca_status_;
@@ -97,6 +99,9 @@ void LeptonPocaAnalyzer::beginJob() {
     tree_->Branch("trk1_vx",      &trk1_vx_);
     tree_->Branch("trk1_vy",      &trk1_vy_);
     tree_->Branch("trk1_vz",      &trk1_vz_);
+    tree_->Branch("trk1_px",      &trk1_px_);
+    tree_->Branch("trk1_py",      &trk1_py_);
+    tree_->Branch("trk1_pz",      &trk1_pz_);
 
     tree_->Branch("trk2_pdgId",   &trk2_pdgId_);
     tree_->Branch("trk2_pt",      &trk2_pt_);
@@ -108,6 +113,9 @@ void LeptonPocaAnalyzer::beginJob() {
     tree_->Branch("trk2_vx",      &trk2_vx_);
     tree_->Branch("trk2_vy",      &trk2_vy_);
     tree_->Branch("trk2_vz",      &trk2_vz_);
+    tree_->Branch("trk2_px",      &trk2_px_);
+    tree_->Branch("trk2_py",      &trk2_py_);
+    tree_->Branch("trk2_pz",      &trk2_pz_);
 
     tree_->Branch("poca1_x", &poca1_x_);
     tree_->Branch("poca1_y", &poca1_y_);
@@ -216,6 +224,9 @@ void LeptonPocaAnalyzer::fillPair(const reco::Track& trk1, int pdgId1,
     trk1_vx_      = trk1.vx();
     trk1_vy_      = trk1.vy();
     trk1_vz_      = trk1.vz();
+    trk1_px_      = trk1.px();
+    trk1_py_      = trk1.py();
+    trk1_pz_      = trk1.pz();
 
     trk2_pdgId_   = pdgId2;
     trk2_pt_      = trk2.pt();
@@ -227,6 +238,9 @@ void LeptonPocaAnalyzer::fillPair(const reco::Track& trk1, int pdgId1,
     trk2_vx_      = trk2.vx();
     trk2_vy_      = trk2.vy();
     trk2_vz_      = trk2.vz();
+    trk2_px_      = trk2.px();
+    trk2_py_      = trk2.py();
+    trk2_pz_      = trk2.pz();
 
     poca1_x_ = pt1.x();  poca1_y_ = pt1.y();  poca1_z_ = pt1.z();
     poca2_x_ = pt2.x();  poca2_y_ = pt2.y();  poca2_z_ = pt2.z();
