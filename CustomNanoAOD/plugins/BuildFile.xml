@@ -7,6 +7,11 @@
 <use name="MagneticField/Records"/>
 <use name="CommonTools/UtilAlgos"/>
 <use name="CommonTools/Utils"/>
+<use name="TrackingTools/TransientTrack"/>
+<use name="TrackingTools/Records"/>
+<use name="RecoVertex/KalmanVertexFit"/>
+<use name="RecoVertex/VertexPrimitives"/>
+<use name="DataFormats/VertexReco"/>
 <use name="rootcore"/>
 <flags EDM_PLUGIN="1"/>
 <!-- Uncomment for CMSSW 10_2_x (pre-UL Run 2); leave commented for CMSSW 12+  -->

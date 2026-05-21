@@ -208,11 +208,37 @@ def AddBFieldZ(process):
     return process
 
 
+def AddInMaterialVertices(process):
+    """
+    Fit all dilepton pairs (μμ, ee, eμ) with KalmanVertexFitter and write pairs
+    that converge (chi2/ndof < 20) and land in tracker material to InMaterialVtx.
+
+    Input collections are linkedObjects muons/electrons — the same collections
+    that feed the NanoAOD Muon and Electron tables, so indices match exactly.
+
+    Output branches: InMaterialVtx_{lep1Idx, lep2Idx, lep1Flavor, lep2Flavor}
+    Flavor: 0 = muon, 1 = electron. For eμ pairs, lep1 is always the muon.
+    """
+    process.inMaterialVertexTable = cms.EDProducer(
+        "InMaterialVertexTableProducer",
+        muons     = cms.InputTag("linkedObjects", "muons"),
+        electrons = cms.InputTag("linkedObjects", "electrons"),
+    )
+
+    if hasattr(process, 'nanoTableTaskCommon'):
+        process.nanoTableTaskCommon.add(process.inMaterialVertexTable)
+    else:
+        process.nanoSequenceCommon += process.inMaterialVertexTable
+
+    return process
+
+
 def PrepDisplacedLeptonsNanoAOD(process):
     # process = DropUnneededTasks(process)
     process = AddMuonTrackVars(process)
     process = AddElectronTrackVars(process)
     process = AddBFieldZ(process)
+    process = AddInMaterialVertices(process)
     # process = add_displaced_muons(process)
     # process = add_displaced_muon_timing(process)
     # process = add_displaced_muon_track_vars(process)
