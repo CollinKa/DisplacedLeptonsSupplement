@@ -7,6 +7,7 @@
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
+#include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "DataFormats/PatCandidates/interface/Muon.h"
@@ -150,9 +151,12 @@ public:
         : muonToken_(consumes<std::vector<pat::Muon>>(
               iConfig.getParameter<edm::InputTag>("muons"))),
           electronToken_(consumes<std::vector<pat::Electron>>(
-              iConfig.getParameter<edm::InputTag>("electrons"))),
-          ttbToken_(esConsumes<TransientTrackBuilder, TransientTrackRecord>(
-              edm::ESInputTag("", "TransientTrackBuilder"))) {
+              iConfig.getParameter<edm::InputTag>("electrons")))
+#ifndef CMSSW_LEGACY_NANO_API
+        , ttbToken_(esConsumes<TransientTrackBuilder, TransientTrackRecord>(
+              edm::ESInputTag("", "TransientTrackBuilder")))
+#endif
+    {
         produces<nanoaod::FlatTable>();
     }
 
@@ -163,7 +167,13 @@ public:
         edm::Handle<std::vector<pat::Electron>> electrons;
         iEvent.getByToken(electronToken_, electrons);
 
+#ifdef CMSSW_LEGACY_NANO_API
+        edm::ESHandle<TransientTrackBuilder> ttBuilderHandle;
+        iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder", ttBuilderHandle);
+        const TransientTrackBuilder& ttBuilder = *ttBuilderHandle;
+#else
         const auto& ttBuilder = iSetup.getData(ttbToken_);
+#endif
         KalmanVertexFitter kvf;
 
         std::vector<int16_t> lep1Idx, lep2Idx;
@@ -214,6 +224,23 @@ public:
                 tryFit(muTT, elTT, muIdx, 0, elIdx, 1);
 
         auto table = std::make_unique<nanoaod::FlatTable>(lep1Idx.size(), "InMaterialVtx", false, false);
+#ifdef CMSSW_LEGACY_NANO_API
+        // CMSSW 10_2_x: explicit template type and ColumnType required; Int16 may be absent so use int.
+        std::vector<int> lep1Idx_i(lep1Idx.begin(), lep1Idx.end());
+        std::vector<int> lep2Idx_i(lep2Idx.begin(), lep2Idx.end());
+        table->addColumn<int>("lep1Idx", lep1Idx_i,
+            "index of first lepton into Muon (lep1Flavor=0) or Electron (lep1Flavor=1) table",
+            nanoaod::FlatTable::IntColumn);
+        table->addColumn<int>("lep2Idx", lep2Idx_i,
+            "index of second lepton into Muon (lep2Flavor=0) or Electron (lep2Flavor=1) table",
+            nanoaod::FlatTable::IntColumn);
+        table->addColumn<uint8_t>("lep1Flavor", lep1Flavor,
+            "flavor of first lepton: 0=muon, 1=electron; for eμ pairs lep1 is always the muon",
+            nanoaod::FlatTable::UInt8Column);
+        table->addColumn<uint8_t>("lep2Flavor", lep2Flavor,
+            "flavor of second lepton: 0=muon, 1=electron; for eμ pairs lep2 is always the electron",
+            nanoaod::FlatTable::UInt8Column);
+#else
         table->addColumn<int16_t>("lep1Idx",    lep1Idx,
             "index of first lepton into Muon (lep1Flavor=0) or Electron (lep1Flavor=1) table");
         table->addColumn<int16_t>("lep2Idx",    lep2Idx,
@@ -222,13 +249,16 @@ public:
             "flavor of first lepton: 0=muon, 1=electron; for eμ pairs lep1 is always the muon");
         table->addColumn<uint8_t>("lep2Flavor", lep2Flavor,
             "flavor of second lepton: 0=muon, 1=electron; for eμ pairs lep2 is always the electron");
+#endif
         iEvent.put(std::move(table));
     }
 
 private:
     edm::EDGetTokenT<std::vector<pat::Muon>>     muonToken_;
     edm::EDGetTokenT<std::vector<pat::Electron>> electronToken_;
+#ifndef CMSSW_LEGACY_NANO_API
     edm::ESGetToken<TransientTrackBuilder, TransientTrackRecord> ttbToken_;
+#endif
 };
 
 DEFINE_FWK_MODULE(InMaterialVertexTableProducer);
