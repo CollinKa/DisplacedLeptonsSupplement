@@ -9,16 +9,6 @@ from PhysicsTools.NanoAOD.common_cff import Var
 CUSTOM_NANO_VERSION = 1
 
 
-# Perigee parameter indices used by reco::TrackBase::covariance(i,j):
-#   0 = q/p
-#   1 = lambda  (= pi/2 - theta, the dip angle)
-#   2 = phi
-#   3 = dxy
-#   4 = dsz     (= dz * cos(lambda), NOT dz)
-_PERIGEE_PARAMS = ["qoverp", "lambda", "phi", "dxy", "dsz"]
-_COV_INDICES = [(i, j) for i in range(5) for j in range(i, 5)]
-
-
 def DropUnneededTasks(process):
     """
     Remove tables not relevant to a displaced dilepton analysis.
@@ -82,7 +72,7 @@ def AddElectronTrackVars(process):
 
 def AddInMaterialVertices(process):
     """
-    Fit all dilepton pairs (μμ, ee, eμ) with KalmanVertexFitter and write pairs
+    Fit all dilepton pairs (mumu, ee, emu) with KalmanVertexFitter and write pairs
     that converge (chi2/ndof < 20) and land in tracker material to InMaterialVtx.
 
     Input collections are linkedObjects muons/electrons — the same collections
@@ -105,8 +95,7 @@ def AddInMaterialVertices(process):
 
     if hasattr(process, 'nanoTableTaskCommon'):
         process.nanoTableTaskCommon.add(process.inMaterialVertexTable)
-    else:
-        process.nanoSequenceCommon += process.inMaterialVertexTable
+    # Run 2: scheduled in PrepDisplacedLeptonsNanoAOD via a dedicated path.
 
     return process
 
@@ -120,4 +109,19 @@ def PrepDisplacedLeptonsNanoAOD(process):
     # process = add_displaced_muon_timing(process)
     # process = add_displaced_muon_track_vars(process)
     process.nanoMetadata.strings.customNanoVersion = cms.string(str(CUSTOM_NANO_VERSION))
+
+    if not hasattr(process, 'nanoTableTaskCommon'):
+        # CMSSW10: nanoSequenceCommon += rebinds the process attribute so the running
+        # path never sees the addition. Use a dedicated Path + schedule.extend() instead,
+        # which is the same pattern addMonitoring uses.
+        _custom = [getattr(process, n) for n in
+                   ('muonBFieldTable', 'electronBFieldTable', 'inMaterialVertexTable')
+                   if hasattr(process, n)]
+        if _custom:
+            _seq = _custom[0]
+            for _p in _custom[1:]:
+                _seq = _seq + _p
+            process.customDisplacedNano_step = cms.Path(_seq)
+            process.schedule.extend([process.customDisplacedNano_step])
+
     return process
