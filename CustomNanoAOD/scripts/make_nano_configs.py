@@ -48,10 +48,10 @@ CUSTOM_COMMAND = (
 # Run2 UL paths are on AFS; update Run3 entries when known.
 GOLDEN_JSONS = {
     2016: (
-        "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions16/13TeV/Legacy_2016/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.txt"
+        "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions16/13TeV/Legacy_2016/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.txt"
     ),
     2017: (
-        "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_JSON.txt"
+        "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.txt"
     ),
     2018: (
         "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt"
@@ -196,7 +196,8 @@ def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_nam
     tokens = _set_arg(tokens, "--python_filename", cfg_path)
     tokens = _set_arg(tokens, "--fileout", "file:nano.root")
     tokens = _set_arg(tokens, "--nThreads", "1")
-    tokens = _set_arg(tokens, "--filein", short_name + "_MiniAOD.root")
+    tokens = _set_arg(tokens, "--filein", "file:" + short_name + "_MiniAOD.root")
+    tokens = _set_arg(tokens, "--number", "5000")
     tokens = _append_to_arg(tokens, "--customise", CUSTOM_CUSTOMIZE, ",")
     tokens = _append_to_arg(tokens, "--customise_command", CUSTOM_COMMAND, "; ")
 
