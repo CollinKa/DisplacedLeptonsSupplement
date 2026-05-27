@@ -75,17 +75,17 @@ def AddInMaterialVertices(process):
     Fit all dilepton pairs (mumu, ee, emu) with KalmanVertexFitter and write pairs
     that converge (chi2/ndof < 20) and land in tracker material to InMaterialVtx.
 
-    Input collections are linkedObjects muons/electrons — the same collections
+    Input collections are linkedObjects muons/electrons - the same collections
     that feed the NanoAOD Muon and Electron tables, so indices match exactly.
 
     Output branches: InMaterialVtx_{lep1Idx, lep2Idx, lep1Flavor, lep2Flavor}
-    Flavor: 0 = muon, 1 = electron. For eμ pairs, lep1 is always the muon.
+    Flavor: 0 = muon, 1 = electron. For emu pairs, lep1 is always the muon.
     """
     # TransientTrackBuilderESProducer is not loaded by the standard NanoAOD
     # sequence (only by full-reco sequences like PostRecoGenerator_cff).
     # It must be present for iSetup.get<TransientTrackRecord>() to succeed.
-    if not hasattr(process, 'TransientTrackBuilderESProducer'):
-        process.load("TrackingTools.TransientTrack.TransientTrackBuilder_cfi")
+    # if not hasattr(process, 'TransientTrackBuilderESProducer'):
+        # process.load("TrackingTools.TransientTrack.TransientTrackBuilder_cfi")
 
     process.inMaterialVertexTable = cms.EDProducer(
         "InMaterialVertexTableProducer",
