@@ -65,7 +65,7 @@ def AddMuonTrackVars(process):
 
 def AddElectronTrackVars(process):
     t = process.electronTable.variables
-    t.dxybs = Var("dB('BS2D')", float, doc="dxy (with sign) wrt the beam spot, in cm", precision=10),
+    t.dxybs = Var("dB('BS2D')", float, doc="dxy (with sign) wrt the beam spot, in cm", precision=10)
     t.dxybsErr = Var("edB('BS2D')", float, doc="dxy uncertainty wrt the beam spot, in cm", precision=6)
     return process
 
