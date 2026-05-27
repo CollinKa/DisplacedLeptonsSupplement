@@ -9,16 +9,6 @@ from PhysicsTools.NanoAOD.common_cff import Var
 CUSTOM_NANO_VERSION = 1
 
 
-# Perigee parameter indices used by reco::TrackBase::covariance(i,j):
-#   0 = q/p
-#   1 = lambda  (= pi/2 - theta, the dip angle)
-#   2 = phi
-#   3 = dxy
-#   4 = dsz     (= dz * cos(lambda), NOT dz)
-_PERIGEE_PARAMS = ["qoverp", "lambda", "phi", "dxy", "dsz"]
-_COV_INDICES = [(i, j) for i in range(5) for j in range(i, 5)]
-
-
 def DropUnneededTasks(process):
     """
     Remove tables not relevant to a displaced dilepton analysis.
@@ -67,150 +57,22 @@ def DropUnneededTasks(process):
 
 
 def AddMuonTrackVars(process):
-    """
-    Add to the muon table:
-      - inner track reference point (vx, vy, vz)
-      - full 5x5 inner track covariance matrix (15 upper-triangle elements)
-      - perigee parameters not already in NanoAOD (qoverp, lambda, dsz)
-
-    These are the quantities needed to run KalmanVertexFitter in Python.
-    dxy and dz are already in standard NanoAOD; dsz = dz*cos(lambda) is stored
-    here instead of dz because that is the native 5th perigee parameter.
-    """
     t = process.muonTable.variables
-
-    # Reference point
-    t.track_vx = Var(
-        "? innerTrack().isNonnull() ? innerTrack().vx() : -99",
-        float, doc="inner track perigee reference point x [cm]", precision=-1)
-    t.track_vy = Var(
-        "? innerTrack().isNonnull() ? innerTrack().vy() : -99",
-        float, doc="inner track perigee reference point y [cm]", precision=-1)
-    t.track_vz = Var(
-        "? innerTrack().isNonnull() ? innerTrack().vz() : -99",
-        float, doc="inner track perigee reference point z [cm]", precision=-1)
-
-    # All 5 Perigee parameters at the track reference point.
-    # NB: standard NanoAOD Muon_dxy uses dB('PV2D') (PV-relative); we store
-    # the origin-relative Perigee parameter 3 needed by the vertex fitter.
-    t.track_qoverp = Var(
-        "? innerTrack().isNonnull() ? innerTrack().qoverp() : -99",
-        float, doc="inner track q/p [1/GeV]", precision=-1)
-    t.track_lambda = Var(
-        "? innerTrack().isNonnull() ? innerTrack().lambda() : -99",
-        float, doc="inner track lambda = pi/2 - theta [rad]", precision=-1)
-    t.track_phi = Var(
-        "? innerTrack().isNonnull() ? innerTrack().phi() : -99",
-        float, doc="inner track perigee phi [rad]", precision=-1)
-    t.track_dxy = Var(
-        "? innerTrack().isNonnull() ? innerTrack().dxy() : -99",
-        float, doc="inner track Perigee dxy (origin-relative) [cm]", precision=-1)
-    t.track_dsz = Var(
-        "? innerTrack().isNonnull() ? innerTrack().dsz() : -99",
-        float, doc="inner track dsz = dz*cos(lambda) [cm]", precision=-1)
-
-    # Full 5x5 covariance (upper triangle, 15 elements)
-    for i, j in _COV_INDICES:
-        name = "track_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
-        setattr(t, name, Var(
-            "? innerTrack().isNonnull() ? innerTrack().covariance({},{}) : -99".format(i, j),
-            float,
-            doc="inner track cov({}, {})".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j]),
-            precision=-1))
-
-    # Timing
     t.timeNdof = Var("time().nDof", int, doc="muon time ndof")
     t.timeAtIpInOut = Var("time().timeAtIpInOut", float, doc="muon time at IP (in-out) [ns]", precision=10)
-
     return process
 
 
 def AddElectronTrackVars(process):
-    """
-    Add to the electron table:
-      - GSF track reference point (vx, vy, vz)
-      - full 5x5 GSF track covariance matrix (15 upper-triangle elements)
-      - perigee parameters not already in NanoAOD (qoverp, lambda, dsz)
-
-    The GSF track covariance and parameters represent the mode of the Gaussian
-    mixture, which is what KalmanVertexFitter uses internally.
-    """
     t = process.electronTable.variables
-
-    # Reference point
-    t.track_vx = Var(
-        "? gsfTrack().isNonnull() ? gsfTrack().vx() : -99",
-        float, doc="GSF track perigee reference point x [cm]", precision=-1)
-    t.track_vy = Var(
-        "? gsfTrack().isNonnull() ? gsfTrack().vy() : -99",
-        float, doc="GSF track perigee reference point y [cm]", precision=-1)
-    t.track_vz = Var(
-        "? gsfTrack().isNonnull() ? gsfTrack().vz() : -99",
-        float, doc="GSF track perigee reference point z [cm]", precision=-1)
-
-    # All 5 Perigee parameters at the track reference point.
-    # NB: standard NanoAOD Electron_dxy uses dB('PV2D') (PV-relative); we store
-    # the origin-relative Perigee parameter 3 needed by the vertex fitter.
-    t.track_qoverp = Var(
-        "? gsfTrack().isNonnull() ? gsfTrack().qoverp() : -99",
-        float, doc="GSF track q/p [1/GeV]", precision=-1)
-    t.track_lambda = Var(
-        "? gsfTrack().isNonnull() ? gsfTrack().lambda() : -99",
-        float, doc="GSF track lambda = pi/2 - theta [rad]", precision=-1)
-    t.track_phi = Var(
-        "? gsfTrack().isNonnull() ? gsfTrack().phi() : -99",
-        float, doc="GSF track perigee phi [rad]", precision=-1)
-    t.track_dxy = Var(
-        "? gsfTrack().isNonnull() ? gsfTrack().dxy() : -99",
-        float, doc="GSF track Perigee dxy (origin-relative) [cm]", precision=-1)
-    t.track_dsz = Var(
-        "? gsfTrack().isNonnull() ? gsfTrack().dsz() : -99",
-        float, doc="GSF track dsz = dz*cos(lambda) [cm]", precision=-1)
-
-    # Full 5x5 covariance (upper triangle, 15 elements)
-    for i, j in _COV_INDICES:
-        name = "track_cov_{}_{}".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j])
-        setattr(t, name, Var(
-            "? gsfTrack().isNonnull() ? gsfTrack().covariance({},{}) : -99".format(i, j),
-            float,
-            doc="GSF track cov({}, {})".format(_PERIGEE_PARAMS[i], _PERIGEE_PARAMS[j]),
-            precision=-1))
-
-    return process
-
-
-def AddBFieldZ(process):
-    """
-    Add bField_z (z-component of the magnetic field at the track reference
-    point, in GeV/cm) to the muon and electron tables via
-    MuonBFieldTableProducer / ElectronBFieldTableProducer.
-
-    Uses the ESHandle API so it compiles under CMSSW 10_2_x and later.
-    """
-    process.muonBFieldTable = cms.EDProducer("MuonBFieldTableProducer",
-        src  = process.muonTable.src,
-        name = process.muonTable.name,
-    )
-    process.electronBFieldTable = cms.EDProducer("ElectronBFieldTableProducer",
-        src  = process.electronTable.src,
-        name = process.electronTable.name,
-    )
-
-    if hasattr(process, 'nanoTableTaskCommon'):
-        # Run 3: task-based scheduling
-        process.nanoTableTaskCommon.add(process.muonBFieldTable)
-        process.nanoTableTaskCommon.add(process.electronBFieldTable)
-    else:
-        # Run 2: sequence-based scheduling
-        process.nanoSequenceCommon += process.muonBFieldTable
-        process.nanoSequenceCommon += process.electronBFieldTable
-
+    t.dxybs = Var("dB('BS2D')", float, doc="dxy (with sign) wrt the beam spot, in cm", precision=10)
+    t.dxybsErr = Var("edB('BS2D')", float, doc="dxy uncertainty wrt the beam spot, in cm", precision=6)
     return process
 
 
 def AddInMaterialVertices(process):
     """
-    Fit all dilepton pairs (μμ, ee, eμ) with KalmanVertexFitter and write pairs
+    Fit all dilepton pairs (mumu, ee, emu) with KalmanVertexFitter and write pairs
     that converge (chi2/ndof < 20) and land in tracker material to InMaterialVtx.
 
     Input collections are linkedObjects muons/electrons — the same collections
@@ -233,8 +95,7 @@ def AddInMaterialVertices(process):
 
     if hasattr(process, 'nanoTableTaskCommon'):
         process.nanoTableTaskCommon.add(process.inMaterialVertexTable)
-    else:
-        process.nanoSequenceCommon += process.inMaterialVertexTable
+    # Run 2: scheduled in PrepDisplacedLeptonsNanoAOD via a dedicated path.
 
     return process
 
@@ -243,10 +104,24 @@ def PrepDisplacedLeptonsNanoAOD(process):
     # process = DropUnneededTasks(process)
     process = AddMuonTrackVars(process)
     process = AddElectronTrackVars(process)
-    process = AddBFieldZ(process)
     process = AddInMaterialVertices(process)
     # process = add_displaced_muons(process)
     # process = add_displaced_muon_timing(process)
     # process = add_displaced_muon_track_vars(process)
     process.nanoMetadata.strings.customNanoVersion = cms.string(str(CUSTOM_NANO_VERSION))
+
+    if not hasattr(process, 'nanoTableTaskCommon'):
+        # CMSSW10: nanoSequenceCommon += rebinds the process attribute so the running
+        # path never sees the addition. Use a dedicated Path + schedule.extend() instead,
+        # which is the same pattern addMonitoring uses.
+        _custom = [getattr(process, n) for n in
+                   ('muonBFieldTable', 'electronBFieldTable', 'inMaterialVertexTable')
+                   if hasattr(process, n)]
+        if _custom:
+            _seq = _custom[0]
+            for _p in _custom[1:]:
+                _seq = _seq + _p
+            process.customDisplacedNano_step = cms.Path(_seq)
+            process.schedule.extend([process.customDisplacedNano_step])
+
     return process
