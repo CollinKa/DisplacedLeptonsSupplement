@@ -56,17 +56,56 @@ def DropUnneededTasks(process):
     return process
 
 
-def AddMuonTrackVars(process):
+def AddMuonVars(process):
     t = process.muonTable.variables
+
+    t.pfIso04_sumChargedHadronPt = Var(
+        "pfIsolationR04().sumChargedHadronPt",
+        float,
+        doc="PF isolation R=0.4, charged hadron pT sum [GeV]",
+        precision=10
+    )
+    t.pfIso04_sumPUPt = Var(
+        "pfIsolationR04().sumPUPt",
+        float,
+        doc="PF isolation R=0.4, PU charged hadron pT sum [GeV]",
+        precision=10
+    )
+    t.pfIso04_sumNeutral = Var(
+        "pfIsolationR04().sumNeutralHadronEt + pfIsolationR04().sumPhotonEt",
+        float,
+        doc="PF isolation R=0.4, neutral hadron + photon ET sum [GeV]",
+        precision=10
+    )
+
     t.timeNdof = Var("time().nDof", int, doc="muon time ndof")
     t.timeAtIpInOut = Var("time().timeAtIpInOut", float, doc="muon time at IP (in-out) [ns]", precision=10)
     return process
 
 
-def AddElectronTrackVars(process):
+def AddElectronVars(process):
     t = process.electronTable.variables
     t.dxybs = Var("dB('BS2D')", float, doc="dxy (with sign) wrt the beam spot, in cm", precision=10)
     t.dxybsErr = Var("edB('BS2D')", float, doc="dxy uncertainty wrt the beam spot, in cm", precision=6)
+
+    t.pfIso03_sumChargedHadronPt = Var(
+        "pfIsolationVariables().sumChargedHadronPt",
+        float,
+        doc="PF isolation R=0.3, charged hadron pT sum [GeV]",
+        precision=10
+    )
+    t.pfIso03_sumPUPt = Var(
+        "pfIsolationVariables().sumPUPt",
+        float,
+        doc="PF isolation R=0.3, PU charged hadron pT sum [GeV]",
+        precision=10
+    )
+    t.pfIso03_sumNeutral = Var(
+        "pfIsolationVariables().sumNeutralHadronEt + pfIsolationVariables().sumPhotonEt",
+        float,
+        doc="PF isolation R=0.3, neutral hadron + photon ET sum [GeV]",
+        precision=10
+    )
     return process
 
 
@@ -102,8 +141,8 @@ def AddInMaterialVertices(process):
 
 def PrepDisplacedLeptonsNanoAOD(process):
     # process = DropUnneededTasks(process)
-    process = AddMuonTrackVars(process)
-    process = AddElectronTrackVars(process)
+    process = AddMuonVars(process)
+    process = AddElectronVars(process)
     process = AddInMaterialVertices(process)
     # process = add_displaced_muons(process)
     # process = add_displaced_muon_timing(process)
