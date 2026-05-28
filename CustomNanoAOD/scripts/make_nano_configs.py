@@ -72,6 +72,7 @@ config.General.transferLogs = True
 config.JobType.pluginName = 'Analysis'
 config.JobType.psetName = '{pset_name}'
 config.JobType.numCores = {num_cores}
+config.JobType.maxMemoryMB = 3000
 config.JobType.outputFiles = ['nano.root']   # must match --fileout in cmsDriver
 
 config.Data.inputDataset = '{input_dataset}'
@@ -105,6 +106,25 @@ def detect_year(dataset: str) -> int:
     if m:
         return int(m.group(1))
     raise ValueError(f"Could not determine run year from dataset path: {dataset}")
+
+
+def get_first_das_file(dataset: str) -> str:
+    """Return the LFN of the first file in a DAS dataset."""
+    cmd = f'dasgoclient -query "file dataset={dataset}" -json | jq -r ".[0].file[0].name"'
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
+    path = result.stdout.strip()
+    if not path or path == "null":
+        raise RuntimeError(f"No files found for dataset: {dataset}")
+    return path
+
+
+def fetch_test_file(miniaod: str, dest_path: str) -> None:
+    """xrdcp the first file of the MiniAOD dataset to dest_path."""
+    lfn = get_first_das_file(miniaod)
+    xrd_url = f"root://cmsxrootd.fnal.gov/{lfn}"
+    print(f"  Fetching test file: {xrd_url}")
+    subprocess.run(["xrdcp", xrd_url, dest_path], check=True)
+    print(f"  Saved to: {dest_path}")
 
 
 def get_config_url(nanoaod_dataset: str) -> str:
@@ -221,7 +241,7 @@ def write_crab_config(
 ) -> None:
     if data:
         splitting = "LumiBased"
-        units_per_job = 50
+        units_per_job = 200
         lumi_json = GOLDEN_JSONS.get(year, f"<TODO: golden JSON for {year}>")
         lumi_mask_line = f"\nconfig.Data.lumiMask = '{lumi_json}'"
         era = f"Run{year}"
@@ -246,7 +266,7 @@ def write_crab_config(
         f.write(content)
 
 
-def process_dataset(miniaod: str, nanoaod: str, output_dir: str) -> tuple:
+def process_dataset(miniaod: str, nanoaod: str, output_dir: str, fetch_test: bool = False) -> tuple:
     """Run the full pipeline for one dataset pair. Returns (cfg_path, crab_path)."""
     short_name = dataset_short_name(miniaod)
     cfg_path = os.path.join(output_dir, f"{short_name}_NANO.py")
@@ -285,6 +305,11 @@ def process_dataset(miniaod: str, nanoaod: str, output_dir: str) -> tuple:
     kind = "data" if data else "MC"
     print(f"  CRAB config ({kind}, {year}): {crab_path}")
 
+    if fetch_test:
+        test_file_path = os.path.join(output_dir, f"{short_name}_MiniAOD.root")
+        print("  Fetching test MiniAOD file...")
+        fetch_test_file(miniaod, test_file_path)
+
     return cfg_path, crab_path
 
 
@@ -300,6 +325,10 @@ def main() -> None:
     parser.add_argument(
         "--output-dir", "-o", default="configs",
         help="Directory for generated config files (default: configs/)",
+    )
+    parser.add_argument(
+        "--fetch-test-file", action="store_true",
+        help="xrdcp the first MiniAOD file from each dataset into the output directory so you can run cmsRun immediately",
     )
     args = parser.parse_args()
 
@@ -320,7 +349,7 @@ def main() -> None:
         nanoaod = pair["nanoaod"]
         print(f"[{miniaod}]")
         try:
-            cfg_path, crab_path = process_dataset(miniaod, nanoaod, args.output_dir)
+            cfg_path, crab_path = process_dataset(miniaod, nanoaod, args.output_dir, fetch_test=args.fetch_test_file)
             crab_configs.append(crab_path)
             print(f"  OK: {cfg_path}\n")
         except Exception as exc:
