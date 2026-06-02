@@ -85,8 +85,6 @@ def AddMuonVars(process):
 
 def AddElectronVars(process):
     t = process.electronTable.variables
-    t.dxybs = Var("dB('BS2D')", float, doc="dxy (with sign) wrt the beam spot, in cm", precision=10)
-    t.dxybsErr = Var("edB('BS2D')", float, doc="dxy uncertainty wrt the beam spot, in cm", precision=6)
 
     t.pfIso03_sumChargedHadronPt = Var(
         "pfIsolationVariables().sumChargedHadronPt",
@@ -106,6 +104,29 @@ def AddElectronVars(process):
         doc="PF isolation R=0.3, neutral hadron + photon ET sum [GeV]",
         precision=10
     )
+    return process
+
+
+def AddElectronDxyBS(process):
+    """
+    Add correct beamspot-relative electron d0 via three methods to the Electron table.
+    Replaces the broken dB('BS2D') Var, which was computed wrt the origin (0,0,0)
+    in all Run 2 MiniAOD due to a bug in CMSSW_9_4_5 PATElectronProducer.
+
+    Branches added (all in cm):
+      dxybs_db / dxybsErr_db       — cached dB(BS2D) from MiniAOD (wrong for Run 2, kept for reference)
+      dxybs_track / dxybsErr_track — gsfTrack()->dxy(beamspot), analytic formula with tilt
+      dxybs_iptools / dxybsErr_iptools — IPTools::signedTransverseImpactParameter
+    """
+    process.electronDxyBS = cms.EDProducer(
+        "ElectronDxyBSProducer",
+        electrons = cms.InputTag("linkedObjects", "electrons"),
+        beamSpot  = cms.InputTag("offlineBeamSpot"),
+    )
+
+    if hasattr(process, 'nanoTableTaskCommon'):
+        process.nanoTableTaskCommon.add(process.electronDxyBS)
+
     return process
 
 
@@ -143,6 +164,7 @@ def PrepDisplacedLeptonsNanoAOD(process):
     # process = DropUnneededTasks(process)
     process = AddMuonVars(process)
     process = AddElectronVars(process)
+    process = AddElectronDxyBS(process)
     process = AddInMaterialVertices(process)
     # process = add_displaced_muons(process)
     # process = add_displaced_muon_timing(process)
@@ -154,7 +176,7 @@ def PrepDisplacedLeptonsNanoAOD(process):
         # path never sees the addition. Use a dedicated Path + schedule.extend() instead,
         # which is the same pattern addMonitoring uses.
         _custom = [getattr(process, n) for n in
-                   ('muonBFieldTable', 'electronBFieldTable', 'inMaterialVertexTable')
+                   ('muonBFieldTable', 'electronBFieldTable', 'electronDxyBS', 'inMaterialVertexTable')
                    if hasattr(process, n)]
         if _custom:
             _seq = _custom[0]
