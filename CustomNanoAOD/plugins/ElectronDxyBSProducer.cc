@@ -90,8 +90,12 @@ void ElectronDxyBSProducer::produce(edm::Event& iEvent, const edm::EventSetup& i
         auto trk = ele.gsfTrack();
         if (trk.isNonnull()) {
             // Primary: analytic formula with beamspot tilt correction
-            dxybs[i]    = trk->dxy(bs);
+            dxybs[i] = trk->dxy(bs);
+#ifdef CMSSW_LEGACY_NANO_API
+            dxybsErr[i] = trk->dxyError();  // dxyError(BeamSpot) not available in CMSSW_10_2_22
+#else
             dxybsErr[i] = trk->dxyError(bs);
+#endif
 
             // Verification: full helix propagation via IPTools
             reco::TransientTrack tt = ttBuilder.build(trk);
