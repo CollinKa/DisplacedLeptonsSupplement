@@ -1,40 +1,33 @@
 #!/usr/bin/env python3
 """
 Generate custom NanoAOD cmsDriver configs and CRAB3 submission configs
-for a list of MiniAOD/NanoAOD dataset pairs.
+for a list of MiniAOD datasets.
 
-For each pair the script:
-  1. Queries DAS for the config used to produce the central NanoAOD dataset.
-  2. Fetches that config and extracts the original cmsDriver command-line options.
-  3. Runs cmsDriver.py with our customizations applied, producing a cfg.py.
-  4. Writes a CRAB3 config that submits the cfg.py against the MiniAOD dataset.
-     Data and MC configs differ: data gets a golden lumi JSON and LumiBased splitting.
+For each dataset the script:
+  1. Looks up the conditions and era for the dataset's campaign from
+     CAMPAIGN_ARGS and constructs the base cmsDriver command directly,
+     without querying DAS for a central config.
+  2. Runs cmsDriver.py with our customizations applied, producing a cfg.py.
+  3. Writes a CRAB3 config that submits the cfg.py against the MiniAOD dataset.
+     Data and MC configs differ: data gets a golden lumi JSON and LumiBased
+     splitting.
 
 A submit_all.sh is also written to the output directory.
 
-Input JSON format:
-    [
-      {
-        "miniaod": "/PrimaryDataset/Run2018A-UL2018_MiniAODv2_NanoAODv9-v1/MINIAOD",
-        "nanoaod": "/PrimaryDataset/Run2018A-UL2018_MiniAODv2_NanoAODv9-v1/NANOAOD"
-      },
-      ...
-    ]
+Input file format: one MiniAOD dataset path per line.
 
 Usage (inside a CMSSW environment):
-    python3 NanoAOD/scripts/make_nano_configs.py datasets.json [--output-dir configs/]
+    python3 make_nano_configs.py datasets.txt [--output-dir configs/]
+
+To add support for a new campaign, add an entry to CAMPAIGN_ARGS.
 """
 
 import argparse
-import http.client
-import json
 import os
 import re
 import shlex
-import ssl
 import subprocess
 import sys
-from urllib.parse import urlparse
 
 CUSTOM_CUSTOMIZE = (
     "DisplacedLeptonsSupplement/CustomNanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsNanoAOD"
@@ -43,6 +36,46 @@ CUSTOM_COMMAND = (
     "process.add_(cms.Service('InitRootHandlers', EnableIMT = cms.untracked.bool(False))); "
     "process.MessageLogger.cerr.FwkReport.reportEvery = 1000"
 )
+
+# Keyed by MC campaign prefix (the leading part of the middle path segment
+# before "MiniAOD") or "data_{year}" for data.
+# "label" is used as the subdirectory in the CRAB output LFN.
+CAMPAIGN_ARGS = {
+    # Run 3 2024 MC
+    "RunIII2024Summer24": {
+        "conditions": "150X_mcRun3_2024_realistic_v2",
+        "era": "Run3_2024",
+        "label": "MC_2024",
+    },
+    # Run 3 2024 data
+    "data_2024": {
+        "conditions": "150X_dataRun3_v2",
+        "era": "Run3_2024",
+        "label": "Run2024",
+    },
+    # Run 3 2023 -- TODO: fill in correct conditions
+    "RunIII2023Summer23": {
+        "conditions": "<TODO: 2023 MC conditions>",
+        "era": "Run3_2023",
+        "label": "MC_2023",
+    },
+    "data_2023": {
+        "conditions": "<TODO: 2023 data conditions>",
+        "era": "Run3_2023",
+        "label": "Run2023",
+    },
+    # Run 3 2022 -- TODO: fill in correct conditions
+    "Run3Summer22": {
+        "conditions": "<TODO: 2022 MC conditions>",
+        "era": "Run3",
+        "label": "MC_2022",
+    },
+    "data_2022": {
+        "conditions": "<TODO: 2022 data conditions>",
+        "era": "Run3",
+        "label": "Run2022",
+    },
+}
 
 # Golden lumi JSON paths for each run year.
 GOLDEN_JSONS = {
@@ -56,7 +89,7 @@ GOLDEN_JSONS = {
     # 2018: "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt",
     2022: "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions22/Cert_Collisions2022_355100_362760_Golden.json",
     2023: "<TODO: Run3 2023 golden JSON path>",
-    2024: "<TODO: Run3 2024 golden JSON path>",
+    2024: "https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions24/Cert_Collisions2024_378981_386951_Golden.json",
 }
 
 CRAB_TEMPLATE = """\
@@ -81,7 +114,7 @@ config.Data.splitting = '{splitting}'
 config.Data.unitsPerJob = {units_per_job}{lumi_mask_line}
 config.Data.publication = False
 
-config.Data.outLFNDirBase = '/store/user/lnestor/customNanoAOD/{era}/'
+config.Data.outLFNDirBase = '/store/user/lnestor/customNanoAOD/{label}/'
 config.Data.outputDatasetTag = '{output_tag}'
 
 config.Site.storageSite = 'T3_US_FNALLPC'
@@ -97,15 +130,51 @@ def is_data(dataset: str) -> bool:
 def detect_year(dataset: str) -> int:
     """
     Extract the run year from a dataset path.
-    Works for both data (Run2018A-...) and MC (RunIISummer20UL18...).
+    Works for data (Run2024C-...), Run 2 MC (RunIISummer20UL18...),
+    and Run 3 MC (RunIII2024Summer24...).
     """
     m = re.search(r"UL(\d{2})\b", dataset)
     if m:
         return 2000 + int(m.group(1))
+    m = re.search(r"RunIII(\d{4})", dataset)
+    if m:
+        return int(m.group(1))
     m = re.search(r"Run(\d{4})", dataset)
     if m:
         return int(m.group(1))
     raise ValueError(f"Could not determine run year from dataset path: {dataset}")
+
+
+def detect_campaign(dataset: str, data: bool) -> str:
+    """Return the CAMPAIGN_ARGS key for the given dataset."""
+    if data:
+        year = detect_year(dataset)
+        return f"data_{year}"
+    middle = dataset.strip("/").split("/")[1]
+    for key in CAMPAIGN_ARGS:
+        if middle.startswith(key):
+            return key
+    raise ValueError(
+        f"No entry in CAMPAIGN_ARGS matches dataset: {dataset}\n"
+        f"  Middle segment: {middle}\n"
+        f"  Add the campaign to CAMPAIGN_ARGS to proceed."
+    )
+
+
+def build_base_cmsdriver_args(dataset: str, data: bool) -> str:
+    """Return the base cmsDriver argument string for the given dataset's campaign."""
+    campaign = detect_campaign(dataset, data)
+    cfg = CAMPAIGN_ARGS[campaign]
+    conditions = cfg["conditions"]
+    era = cfg["era"]
+    mc_or_data = "--data" if data else "--mc"
+    datatier = "NANOAOD" if data else "NANOAODSIM"
+    return (
+        f"NANO {mc_or_data} --conditions {conditions} --era {era} "
+        f"--datatier {datatier} --eventcontent {datatier} "
+        f"--step NANO --scenario pp --no_exec "
+        f"--customise Configuration/DataProcessing/Utils.addMonitoring"
+    )
 
 
 def get_first_das_file(dataset: str) -> str:
@@ -127,55 +196,26 @@ def fetch_test_file(miniaod: str, dest_path: str) -> None:
     print(f"  Saved to: {dest_path}")
 
 
-def get_config_url(nanoaod_dataset: str) -> str:
-    """Return the URL of the config that produced the given NanoAOD dataset."""
-    cmd = (
-        f'dasgoclient -query "config dataset={nanoaod_dataset}" -json '
-        f"| jq -r '[.[].config[]] | map(select(.idict.byoutputdataset != null)) | .[0].urls[0]'"
-    )
-    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
-    url = result.stdout.strip()
-    if not url or url == "null":
-        raise RuntimeError(f"No config URL returned for NanoAOD dataset: {nanoaod_dataset}")
-    return url
-
-
-def fetch_config_text(url: str) -> str:
-    """Fetch a cmsweb URL authenticated with the VOMS proxy certificate."""
-    proxy = os.environ.get("X509_USER_PROXY", "")
-    if not proxy:
-        raise RuntimeError("X509_USER_PROXY is not set; run voms-proxy-init first")
-
-    # Use Python's ssl module (OpenSSL-backed in CMSSW) rather than the
-    # system curl, which is NSS-backed on EL7 and cannot parse VOMS proxies.
-    ctx = ssl.create_default_context(capath="/etc/grid-security/certificates/")
-    ctx.load_cert_chain(proxy)
-
-    parsed = urlparse(url)
-    conn = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, context=ctx)
-    conn.request("GET", parsed.path)
-    resp = conn.getresponse()
-    if resp.status != 200:
-        raise RuntimeError("HTTP {} fetching {}".format(resp.status, url))
-    return resp.read().decode("utf-8")
-
-
-def extract_cmsdriver_args(config_text: str) -> str:
-    for line in config_text.splitlines():
-        if "# with command line options:" in line:
-            return line.split("# with command line options:", 1)[1].strip()
-    raise ValueError("Could not find '# with command line options:' line in config")
-
-
 def dataset_short_name(dataset: str) -> str:
-    """Return a unique short name incorporating the primary dataset and run era.
+    """Return a unique short name incorporating the primary dataset and run era,
+    with a reprocessing version suffix when present in the processing tag (data only).
 
-    /MuonEG/Run2018C-UL2018_MiniAODv2_GT36-v1/MINIAOD -> MuonEG_Run2018C
+    /MuonEG/Run2024I-MINIv6NANOv15-v2/MINIAOD    -> MuonEG_Run2024I
+    /MuonEG/Run2024I-MINIv6NANOv15_v2-v2/MINIAOD  -> MuonEG_Run2024I_v2
     """
     parts = dataset.strip("/").split("/")
     primary = parts[0]
-    era = parts[1].split("-")[0] if len(parts) > 1 else ""
-    return "{}_{}".format(primary, era) if era else primary
+    if len(parts) <= 1:
+        return primary
+    tier = parts[-1]
+    segments = parts[1].split("-")
+    era = segments[0]
+    suffix = ""
+    if tier == "MINIAOD" and len(segments) > 1:
+        m = re.search(r"(_v\d+)$", segments[1])
+        if m:
+            suffix = m.group(1)
+    return "{}_{}{}".format(primary, era, suffix)
 
 
 def _set_arg(tokens: list, flag: str, value: str) -> list:
@@ -205,8 +245,8 @@ def _get_arg(tokens: list, flag: str):
 
 def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_name: str) -> tuple:
     """
-    Apply our customizations to the original cmsDriver args.
-    Returns (shell_command_string, input_dataset_string).
+    Apply our customizations to the base cmsDriver args.
+    Returns (shell_command_string, input_dataset_string, num_cores).
     """
     tokens = shlex.split(original_args)
 
@@ -215,15 +255,13 @@ def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_nam
     tokens = _set_arg(tokens, "--nThreads", "1")
     tokens = _set_arg(tokens, "--filein", "file:" + short_name + "_MiniAOD.root")
     tokens = _set_arg(tokens, "--number", "5000")
+    tokens = _set_arg(tokens, "--step", "NANO")
     tokens = _append_to_arg(tokens, "--customise", CUSTOM_CUSTOMIZE, ",")
     tokens = _append_to_arg(tokens, "--customise_command", CUSTOM_COMMAND, "; ")
-
-    if data:
-        tokens = _set_arg(tokens, "--eventcontent", "NANOAOD")
+    tokens = _set_arg(tokens, "--eventcontent", "NANOAOD" if data else "NANOAODSIM")
 
     filein = _get_arg(tokens, "--filein") or ""
     input_dataset = filein.removeprefix("dbs:") if filein.startswith("dbs:") else filein
-
     num_cores = int(_get_arg(tokens, "--nThreads") or 1)
 
     cmd = "cmsDriver.py " + " ".join(shlex.quote(t) for t in tokens)
@@ -236,73 +274,58 @@ def write_crab_config(
     short_name: str,
     input_dataset: str,
     data: bool,
-    year: int,
+    dataset: str,
     num_cores: int = 1,
 ) -> None:
+    year = detect_year(dataset)
+    campaign = detect_campaign(dataset, data)
+    label = CAMPAIGN_ARGS[campaign]["label"]
+
     if data:
         splitting = "LumiBased"
-        units_per_job = 200
+        units_per_job = 75
         lumi_json = GOLDEN_JSONS.get(year, f"<TODO: golden JSON for {year}>")
         lumi_mask_line = f"\nconfig.Data.lumiMask = '{lumi_json}'"
-        era = f"Run{year}"
     else:
         splitting = "FileBased"
-        units_per_job = 1
+        units_per_job = 25
         lumi_mask_line = ""
-        era = f"UL{str(year)[2:]}"  # 2018 -> UL18
 
     content = CRAB_TEMPLATE.format(
         request_name="{}_customNanoAOD".format(short_name)[:100],
-        pset_name=os.path.abspath(cfg_path),
+        pset_name=os.path.basename(cfg_path),
         num_cores=num_cores,
         input_dataset=input_dataset,
         splitting=splitting,
         units_per_job=units_per_job,
         lumi_mask_line=lumi_mask_line,
-        era=era,
+        label=label,
         output_tag="{}_customNanoAOD".format(short_name),
     )
     with open(crab_path, "w") as f:
         f.write(content)
 
 
-def process_dataset(miniaod: str, nanoaod: str, output_dir: str, fetch_test: bool = False) -> tuple:
-    """Run the full pipeline for one dataset pair. Returns (cfg_path, crab_path)."""
+def process_dataset(miniaod: str, output_dir: str, fetch_test: bool = False) -> tuple:
+    """Run the full pipeline for one dataset. Returns (cfg_path, crab_path)."""
     short_name = dataset_short_name(miniaod)
     cfg_path = os.path.join(output_dir, f"{short_name}_NANO.py")
     crab_path = os.path.join(output_dir, f"crab_{short_name}.py")
     data = is_data(miniaod)
 
-    try:
-        year = detect_year(miniaod)
-    except ValueError as e:
-        print(f"  WARNING: {e}; year-dependent fields will use placeholders")
-        year = 0
-
-    print("  Querying DAS for config URL...")
-    url = get_config_url(nanoaod)
-    print(f"  URL: {url}")
-
-    print("  Fetching config file...")
-    config_text = fetch_config_text(url)
-
-    original_args = extract_cmsdriver_args(config_text)
-    cmd, input_dataset, num_cores = build_cmsdriver_cmd(original_args, cfg_path, data, short_name)
+    base_args = build_base_cmsdriver_args(miniaod, data)
+    cmd, input_dataset, num_cores = build_cmsdriver_cmd(base_args, cfg_path, data, short_name)
 
     print("  Running cmsDriver.py...")
     print(f"    {cmd[:120]}{'...' if len(cmd) > 120 else ''}")
     subprocess.run(cmd, shell=True, check=True)
 
-    # Central configs use _placeholder_.root for --filein; always use the
-    # actual miniaod argument as the CRAB input dataset.
-    if input_dataset and input_dataset.startswith("/"):
-        print("  Input dataset (crab): {}".format(input_dataset))
-    else:
-        input_dataset = miniaod
-        print("  Input dataset (crab): {} (from JSON)".format(input_dataset))
+    input_dataset = miniaod
+    print("  Input dataset (crab): {}".format(input_dataset))
 
-    write_crab_config(crab_path, cfg_path, short_name, input_dataset, data, year, num_cores)
+    write_crab_config(crab_path, cfg_path, short_name, input_dataset, data, miniaod, num_cores)
     kind = "data" if data else "MC"
+    year = detect_year(miniaod)
     print(f"  CRAB config ({kind}, {year}): {crab_path}")
 
     if fetch_test:
@@ -320,7 +343,7 @@ def main() -> None:
     )
     parser.add_argument(
         "datasets_file",
-        help="JSON file with a list of {miniaod, nanoaod} dataset pairs",
+        help="Text file with one MiniAOD dataset path per line",
     )
     parser.add_argument(
         "--output-dir", "-o", default="configs",
@@ -335,21 +358,19 @@ def main() -> None:
     os.makedirs(args.output_dir, exist_ok=True)
 
     with open(args.datasets_file) as f:
-        pairs = json.load(f)
+        datasets = [line.strip() for line in f if line.strip()]
 
-    if not pairs:
-        sys.exit("No dataset pairs found in input file.")
+    if not datasets:
+        sys.exit("No datasets found in input file.")
 
-    print(f"Processing {len(pairs)} dataset pair(s) -> {args.output_dir}/\n")
+    print(f"Processing {len(datasets)} dataset(s) -> {args.output_dir}/\n")
 
     crab_configs = []
     failed = []
-    for pair in pairs:
-        miniaod = pair["miniaod"]
-        nanoaod = pair["nanoaod"]
+    for miniaod in datasets:
         print(f"[{miniaod}]")
         try:
-            cfg_path, crab_path = process_dataset(miniaod, nanoaod, args.output_dir, fetch_test=args.fetch_test_file)
+            cfg_path, crab_path = process_dataset(miniaod, args.output_dir, fetch_test=args.fetch_test_file)
             crab_configs.append(crab_path)
             print(f"  OK: {cfg_path}\n")
         except Exception as exc:

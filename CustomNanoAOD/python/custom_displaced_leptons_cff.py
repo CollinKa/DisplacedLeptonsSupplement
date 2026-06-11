@@ -1,10 +1,6 @@
 import FWCore.ParameterSet.Config as cms
 from PhysicsTools.NanoAOD.common_cff import Var
-# from DisplacedLeptonsSupplement.CustomNanoAOD.displacedMuons_cff import (
-    # add_displaced_muons,
-    # add_displaced_muon_timing,
-    # add_displaced_muon_track_vars,
-# )
+from DisplacedLeptonsSupplement.CustomNanoAOD.displacedMuons_cff import add_displaced_muons
 
 CUSTOM_NANO_VERSION = 1
 
@@ -114,18 +110,16 @@ def AddElectronDxyBS(process):
     in all Run 2 MiniAOD due to a bug in CMSSW_9_4_5 PATElectronProducer.
 
     Branches added (all in cm):
-      dxybs_db / dxybsErr_db       — cached dB(BS2D) from MiniAOD (wrong for Run 2, kept for reference)
-      dxybs_track / dxybsErr_track — gsfTrack()->dxy(beamspot), analytic formula with tilt
-      dxybs_iptools / dxybsErr_iptools — IPTools::signedTransverseImpactParameter
+      dxybs / dxybsErr  - gsfTrack()->dxy(beamspot), analytic formula with tilt
     """
-    process.electronDxyBS = cms.EDProducer(
+    process.electronDxyBSTable = cms.EDProducer(
         "ElectronDxyBSProducer",
         electrons = cms.InputTag("linkedObjects", "electrons"),
         beamSpot  = cms.InputTag("offlineBeamSpot"),
     )
 
     if hasattr(process, 'nanoTableTaskCommon'):
-        process.nanoTableTaskCommon.add(process.electronDxyBS)
+        process.nanoTableTaskCommon.add(process.electronDxyBSTable)
 
     return process
 
@@ -166,9 +160,7 @@ def PrepDisplacedLeptonsNanoAOD(process):
     process = AddElectronVars(process)
     process = AddElectronDxyBS(process)
     process = AddInMaterialVertices(process)
-    # process = add_displaced_muons(process)
-    # process = add_displaced_muon_timing(process)
-    # process = add_displaced_muon_track_vars(process)
+    process = add_displaced_muons(process)
     process.nanoMetadata.strings.customNanoVersion = cms.string(str(CUSTOM_NANO_VERSION))
 
     if not hasattr(process, 'nanoTableTaskCommon'):
@@ -176,7 +168,7 @@ def PrepDisplacedLeptonsNanoAOD(process):
         # path never sees the addition. Use a dedicated Path + schedule.extend() instead,
         # which is the same pattern addMonitoring uses.
         _custom = [getattr(process, n) for n in
-                   ('muonBFieldTable', 'electronBFieldTable', 'electronDxyBS', 'inMaterialVertexTable')
+                   ('muonBFieldTable', 'electronBFieldTable', 'electronDxyBSTable', 'inMaterialVertexTable')
                    if hasattr(process, n)]
         if _custom:
             _seq = _custom[0]
