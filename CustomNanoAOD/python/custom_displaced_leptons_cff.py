@@ -1,6 +1,12 @@
 import FWCore.ParameterSet.Config as cms
 from PhysicsTools.NanoAOD.common_cff import Var
 from DisplacedLeptonsSupplement.CustomNanoAOD.displacedMuons_cff import add_displaced_muons
+from DisplacedLeptonsSupplement.CustomNanoAOD.disapp_trks_cff import (
+    AddDisappTrksEGammaTriggerSkim,
+    AddDisappTrksMETTriggerSkim,
+    AddDisappTrksMuonTriggerSkim,
+    AddDisappTrksNanoTables,
+)
 
 CUSTOM_NANO_VERSION = 1
 
@@ -177,4 +183,28 @@ def PrepDisplacedLeptonsNanoAOD(process):
             process.customDisplacedNano_step = cms.Path(_seq)
             process.schedule.extend([process.customDisplacedNano_step])
 
+    return process
+
+
+def PrepDisplacedLeptonsDisappTrksNanoAOD(process):
+    process = PrepDisplacedLeptonsNanoAOD(process)
+    process = AddDisappTrksNanoTables(process)
+    return process
+
+
+def PrepDisplacedLeptonsDisappTrksNanoAOD_METSkim(process):
+    process = PrepDisplacedLeptonsDisappTrksNanoAOD(process)
+    process = AddDisappTrksMETTriggerSkim(process)
+    return process
+
+
+def PrepDisplacedLeptonsDisappTrksNanoAOD_MuonSkim(process):
+    process = PrepDisplacedLeptonsDisappTrksNanoAOD(process)
+    process = AddDisappTrksMuonTriggerSkim(process)
+    return process
+
+
+def PrepDisplacedLeptonsDisappTrksNanoAOD_EGammaSkim(process):
+    process = PrepDisplacedLeptonsDisappTrksNanoAOD(process)
+    process = AddDisappTrksEGammaTriggerSkim(process)
     return process

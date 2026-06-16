@@ -29,9 +29,24 @@ import shlex
 import subprocess
 import sys
 
-CUSTOM_CUSTOMIZE = (
-    "DisplacedLeptonsSupplement/CustomNanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsNanoAOD"
-)
+CUSTOMIZE_OPTIONS = {
+    "displaced-leptons": (
+        "DisplacedLeptonsSupplement/CustomNanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsNanoAOD"
+    ),
+    "disapptrks": (
+        "DisplacedLeptonsSupplement/CustomNanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsDisappTrksNanoAOD"
+    ),
+    "disapptrks-met-skim": (
+        "DisplacedLeptonsSupplement/CustomNanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsDisappTrksNanoAOD_METSkim"
+    ),
+    "disapptrks-muon-skim": (
+        "DisplacedLeptonsSupplement/CustomNanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsDisappTrksNanoAOD_MuonSkim"
+    ),
+    "disapptrks-egamma-skim": (
+        "DisplacedLeptonsSupplement/CustomNanoAOD/custom_displaced_leptons_cff.PrepDisplacedLeptonsDisappTrksNanoAOD_EGammaSkim"
+    ),
+}
+DEFAULT_CUSTOMIZE = "displaced-leptons"
 CUSTOM_COMMAND = (
     "process.add_(cms.Service('InitRootHandlers', EnableIMT = cms.untracked.bool(False))); "
     "process.MessageLogger.cerr.FwkReport.reportEvery = 1000"
@@ -114,7 +129,7 @@ config.Data.splitting = '{splitting}'
 config.Data.unitsPerJob = {units_per_job}{lumi_mask_line}
 config.Data.publication = False
 
-config.Data.outLFNDirBase = '/store/user/lnestor/customNanoAOD/{label}/'
+config.Data.outLFNDirBase = '{out_lfn_dir_base}/{label}/'
 config.Data.outputDatasetTag = '{output_tag}'
 
 config.Site.storageSite = 'T3_US_FNALLPC'
@@ -243,7 +258,11 @@ def _get_arg(tokens: list, flag: str):
     return None
 
 
-def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_name: str) -> tuple:
+def _sanitize_label(label: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_]+", "_", label).strip("_")
+
+
+def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_name: str, customize: str) -> tuple:
     """
     Apply our customizations to the base cmsDriver args.
     Returns (shell_command_string, input_dataset_string, num_cores).
@@ -256,7 +275,7 @@ def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_nam
     tokens = _set_arg(tokens, "--filein", "file:" + short_name + "_MiniAOD.root")
     tokens = _set_arg(tokens, "--number", "5000")
     tokens = _set_arg(tokens, "--step", "NANO")
-    tokens = _append_to_arg(tokens, "--customise", CUSTOM_CUSTOMIZE, ",")
+    tokens = _append_to_arg(tokens, "--customise", CUSTOMIZE_OPTIONS[customize], ",")
     tokens = _append_to_arg(tokens, "--customise_command", CUSTOM_COMMAND, "; ")
     tokens = _set_arg(tokens, "--eventcontent", "NANOAOD" if data else "NANOAODSIM")
 
@@ -276,6 +295,7 @@ def write_crab_config(
     data: bool,
     dataset: str,
     num_cores: int = 1,
+    out_lfn_dir_base: str = "/store/user/lnestor/customNanoAOD",
 ) -> None:
     year = detect_year(dataset)
     campaign = detect_campaign(dataset, data)
@@ -301,20 +321,30 @@ def write_crab_config(
         lumi_mask_line=lumi_mask_line,
         label=label,
         output_tag="{}_customNanoAOD".format(short_name),
+        out_lfn_dir_base=out_lfn_dir_base.rstrip("/"),
     )
     with open(crab_path, "w") as f:
         f.write(content)
 
 
-def process_dataset(miniaod: str, output_dir: str, fetch_test: bool = False) -> tuple:
+def process_dataset(
+    miniaod: str,
+    output_dir: str,
+    fetch_test: bool = False,
+    customize: str = DEFAULT_CUSTOMIZE,
+    out_lfn_dir_base: str = "/store/user/lnestor/customNanoAOD",
+) -> tuple:
     """Run the full pipeline for one dataset. Returns (cfg_path, crab_path)."""
     short_name = dataset_short_name(miniaod)
-    cfg_path = os.path.join(output_dir, f"{short_name}_NANO.py")
-    crab_path = os.path.join(output_dir, f"crab_{short_name}.py")
+    cfg_stem = short_name
+    if customize != DEFAULT_CUSTOMIZE:
+        cfg_stem = "{}_{}".format(short_name, _sanitize_label(customize))
+    cfg_path = os.path.join(output_dir, f"{cfg_stem}_NANO.py")
+    crab_path = os.path.join(output_dir, f"crab_{cfg_stem}.py")
     data = is_data(miniaod)
 
     base_args = build_base_cmsdriver_args(miniaod, data)
-    cmd, input_dataset, num_cores = build_cmsdriver_cmd(base_args, cfg_path, data, short_name)
+    cmd, input_dataset, num_cores = build_cmsdriver_cmd(base_args, cfg_path, data, short_name, customize)
 
     print("  Running cmsDriver.py...")
     print(f"    {cmd[:120]}{'...' if len(cmd) > 120 else ''}")
@@ -323,7 +353,16 @@ def process_dataset(miniaod: str, output_dir: str, fetch_test: bool = False) -> 
     input_dataset = miniaod
     print("  Input dataset (crab): {}".format(input_dataset))
 
-    write_crab_config(crab_path, cfg_path, short_name, input_dataset, data, miniaod, num_cores)
+    write_crab_config(
+        crab_path,
+        cfg_path,
+        cfg_stem,
+        input_dataset,
+        data,
+        miniaod,
+        num_cores,
+        out_lfn_dir_base=out_lfn_dir_base,
+    )
     kind = "data" if data else "MC"
     year = detect_year(miniaod)
     print(f"  CRAB config ({kind}, {year}): {crab_path}")
@@ -353,6 +392,17 @@ def main() -> None:
         "--fetch-test-file", action="store_true",
         help="xrdcp the first MiniAOD file from each dataset into the output directory so you can run cmsRun immediately",
     )
+    parser.add_argument(
+        "--customize",
+        choices=sorted(CUSTOMIZE_OPTIONS),
+        default=DEFAULT_CUSTOMIZE,
+        help="NanoAOD customization to apply (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--out-lfn-dir-base",
+        default="/store/user/lnestor/customNanoAOD",
+        help="CRAB output LFN base. Use /store/group/lpcdisapptrks/CollinTest for large disTk validation tests.",
+    )
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -370,7 +420,13 @@ def main() -> None:
     for miniaod in datasets:
         print(f"[{miniaod}]")
         try:
-            cfg_path, crab_path = process_dataset(miniaod, args.output_dir, fetch_test=args.fetch_test_file)
+            cfg_path, crab_path = process_dataset(
+                miniaod,
+                args.output_dir,
+                fetch_test=args.fetch_test_file,
+                customize=args.customize,
+                out_lfn_dir_base=args.out_lfn_dir_base,
+            )
             crab_configs.append(crab_path)
             print(f"  OK: {cfg_path}\n")
         except Exception as exc:

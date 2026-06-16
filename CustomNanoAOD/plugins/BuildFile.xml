@@ -1,8 +1,16 @@
 <use name="FWCore/Framework"/>
 <use name="FWCore/ParameterSet"/>
+<use name="CondFormats/DataRecord"/>
+<use name="CondFormats/EcalObjects"/>
+<use name="DataFormats/Common"/>
+<use name="DataFormats/DetId"/>
+<use name="DataFormats/EcalDetId"/>
+<use name="DataFormats/Math"/>
 <use name="DataFormats/PatCandidates"/>
 <use name="DataFormats/NanoAOD"/>
 <use name="DataFormats/GeometryVector"/>
+<use name="DataFormats/TrackReco"/>
+<use name="DataFormats/SiPixelDetId"/>
 <use name="MagneticField/Engine"/>
 <use name="MagneticField/Records"/>
 <use name="CommonTools/UtilAlgos"/>
@@ -14,6 +22,8 @@
 <use name="RecoVertex/KalmanVertexFit"/>
 <use name="RecoVertex/VertexPrimitives"/>
 <use name="DataFormats/VertexReco"/>
+<use name="Geometry/CaloGeometry"/>
+<use name="Geometry/Records"/>
 <use name="rootcore"/>
 <flags EDM_PLUGIN="1"/>
 <!-- Uncomment for CMSSW 10_2_x (pre-UL Run 2); leave commented for CMSSW 12+  -->

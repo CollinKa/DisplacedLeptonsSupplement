@@ -2,3 +2,5 @@
 __pycache__
 .*.swp
 crab_projects/
+CustomNanoAOD/test_outputs/
+CustomNanoAOD/validation/results/

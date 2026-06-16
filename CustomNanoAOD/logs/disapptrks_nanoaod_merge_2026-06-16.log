@@ -1,0 +1,254 @@
+2026-06-16 12:35:32 EDT
+
+Purpose
+-------
+Stage a DLS-style disappearing-track custom NanoAOD merge with Table 9 trigger-skim modes.
+
+Environment
+-----------
+Local cwd:
+  /Users/haoliangzheng/Documents/disTkOld
+
+Requested LPC target:
+  /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement
+
+Result:
+  The /uscms/home/czheng path was not mounted in this local environment.
+  Work was staged under /private/tmp/CollinKa_DisplacedLeptonsSupplement.
+
+Clone
+-----
+Command:
+  git clone git@github.com:CollinKa/DisplacedLeptonsSupplement.git /private/tmp/CollinKa_DisplacedLeptonsSupplement
+
+Result:
+  Failed because SSH host-key verification required an interactive askpass.
+
+Fallback command:
+  git clone https://github.com/CollinKa/DisplacedLeptonsSupplement.git /private/tmp/CollinKa_DisplacedLeptonsSupplement
+
+Result:
+  Succeeded.
+
+File Changes
+------------
+Copied mechanically from local AI_disTk:
+  NanoAOD/plugins/DisappTrksNanoTables.cc
+
+Copied to staged DLS path:
+  CustomNanoAOD/plugins/DisappTrksNanoTables.cc
+
+Modified:
+  CustomNanoAOD/plugins/BuildFile.xml
+  CustomNanoAOD/python/custom_displaced_leptons_cff.py
+  CustomNanoAOD/scripts/make_nano_configs.py
+
+Added:
+  CustomNanoAOD/python/disapp_trks_cff.py
+  CustomNanoAOD/docs/disapptrks_nanoaod_merge_2026-06-16.md
+  CustomNanoAOD/logs/disapptrks_nanoaod_merge_2026-06-16.log
+
+Trigger Customizers Added
+-------------------------
+  PrepDisplacedLeptonsDisappTrksNanoAOD
+  PrepDisplacedLeptonsDisappTrksNanoAOD_METSkim
+  PrepDisplacedLeptonsDisappTrksNanoAOD_MuonSkim
+  PrepDisplacedLeptonsDisappTrksNanoAOD_EGammaSkim
+
+Config Generator Options Added
+------------------------------
+  --customize displaced-leptons
+  --customize disapptrks
+  --customize disapptrks-met-skim
+  --customize disapptrks-muon-skim
+  --customize disapptrks-egamma-skim
+  --out-lfn-dir-base
+
+Large-Output Policy
+-------------------
+No large output was created.
+For larger validation tests, use:
+  /store/group/lpcdisapptrks/CollinTest
+
+Do not launch tests expected to exceed 200 GB without explicit approval.
+
+Validation Commands
+-------------------
+Command:
+  python3 -m py_compile /private/tmp/CollinKa_DisplacedLeptonsSupplement/CustomNanoAOD/scripts/make_nano_configs.py /private/tmp/CollinKa_DisplacedLeptonsSupplement/CustomNanoAOD/python/custom_displaced_leptons_cff.py /private/tmp/CollinKa_DisplacedLeptonsSupplement/CustomNanoAOD/python/disapp_trks_cff.py
+
+Result:
+  Passed.
+
+Command:
+  git -C /private/tmp/CollinKa_DisplacedLeptonsSupplement status --short
+
+Result:
+  M CustomNanoAOD/plugins/BuildFile.xml
+  M CustomNanoAOD/python/custom_displaced_leptons_cff.py
+  M CustomNanoAOD/scripts/make_nano_configs.py
+  ?? CustomNanoAOD/docs/
+  ?? CustomNanoAOD/logs/
+  ?? CustomNanoAOD/plugins/DisappTrksNanoTables.cc
+  ?? CustomNanoAOD/python/disapp_trks_cff.py
+
+Limitations
+-----------
+Initial local CMSSW build and cmsRun smoke tests were not run because the local environment is not the LPC CMSSW runtime.
+
+LPC Install
+-----------
+Command:
+  ssh -Y -o BatchMode=yes -o ConnectTimeout=15 czheng@cmslpc-el9.fnal.gov 'set -e; cd /uscms/home/czheng/nobackup/CMSSW_15_0_10/src; if [ -e DisplacedLeptonsSupplement ]; then echo TARGET_EXISTS; exit 2; fi; git clone https://github.com/CollinKa/DisplacedLeptonsSupplement.git DisplacedLeptonsSupplement; cd DisplacedLeptonsSupplement; git status --short; git remote -v'
+
+Result:
+  Succeeded.
+
+Transferred files to LPC:
+  CustomNanoAOD/plugins/BuildFile.xml
+  CustomNanoAOD/plugins/DisappTrksNanoTables.cc
+  CustomNanoAOD/python/custom_displaced_leptons_cff.py
+  CustomNanoAOD/python/disapp_trks_cff.py
+  CustomNanoAOD/scripts/make_nano_configs.py
+  CustomNanoAOD/docs/disapptrks_nanoaod_merge_2026-06-16.md
+  CustomNanoAOD/logs/disapptrks_nanoaod_merge_2026-06-16.log
+
+Note:
+  A duplicate copy of disapptrks_nanoaod_merge_2026-06-16.log was accidentally copied to CustomNanoAOD/docs/.
+  It was left in place because no deletion was performed without user approval.
+
+LPC Validation
+--------------
+Command:
+  python3 -m py_compile /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/scripts/make_nano_configs.py /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/python/custom_displaced_leptons_cff.py /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/python/disapp_trks_cff.py
+
+Result:
+  Passed.
+
+Command:
+  git diff --check
+
+Result:
+  Passed.
+
+Command:
+  scram b -j 8 DisplacedLeptonsSupplement/CustomNanoAOD
+
+Result:
+  Passed.
+  Registered EDM plugins included:
+    disappTrkTable
+    disappMuonTable
+    disappObjectTables
+    disappMetNoMuTable
+
+Command:
+  import combined disTk customizers and print trigger-list sizes
+
+Result:
+  15 1 1
+
+Remaining Limitations
+---------------------
+cmsRun smoke tests were not run, so no ROOT output was produced.
+Large-output tests must use /store/group/lpcdisapptrks/CollinTest and stay below 200 GB unless explicitly approved.
+
+Post-Smoke-Test Update
+----------------------
+User approved deleting the accidentally copied duplicate log under:
+  CustomNanoAOD/docs/disapptrks_nanoaod_merge_2026-06-16.log
+
+That duplicate was removed. The canonical log remains:
+  CustomNanoAOD/logs/disapptrks_nanoaod_merge_2026-06-16.log
+
+Plugin collision found:
+  edmPluginHelp -p DisappTrkTableProducer initially resolved to AI_disTk:
+    pluginAIDisTkNanoAODPlugins.so
+
+Fix:
+  Renamed DLS plugin classes to:
+    DLSDisappTrkTableProducer
+    DLSDisappMuonTableProducer
+    DLSDisappObjectTablesProducer
+    DLSDisappMetNoMuTableProducer
+  Refreshed the CMSSW plugin cache:
+    edmPluginRefresh -p /uscms/home/czheng/nobackup/CMSSW_15_0_10/lib/el9_amd64_gcc12
+
+Validation:
+  edmPluginHelp -p DLSDisappTrkTableProducer resolved to:
+    pluginDisplacedLeptonsSupplementCustomNanoAODAuto.so
+
+Initial DLS-fixed cmsRun result:
+  Failed with:
+    Trying to save an extension table for Electron before having saved the corresponding main table
+
+Fix:
+  Saved only missing object extras as lowercase DLS compatibility tables:
+    muon_isTrigMatched
+    muon_pfRelIso04_dBeta
+    ele_isTrigMatched
+    tau_isTight
+    tau_decayModeFindingNewDMs
+    jet_isTightLepVeto
+  Removed duplicate lowercase kinematic/rho custom outputs from the scheduled combined producer.
+
+Successful small NanoAOD smoke test:
+  Command:
+    cmsRun DisplacedLeptonsSupplement/CustomNanoAOD/test/disapptrks_run2022F_muon_skim_smoke_cfg.py maxEvents=350 outputFile=/uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/test_outputs/disapptrks_run2022F_muon_skim_max350_dlsfixed2.root
+  Input MiniAOD:
+    /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/AI_disTk/local_samples/run2022F/miniaod.root
+  Output NanoAOD:
+    /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/test_outputs/disapptrks_run2022F_muon_skim_max350_dlsfixed2_numEvent350.root
+  Result:
+    Events total = 350
+    Passed = 30
+    Failed = 320
+
+Explicit branch/type spot check:
+  entries: 30
+  HLT_IsoMu24: Bool_t
+  metNoMu_pt: Float_t
+  metNoMu_phi: Float_t
+  muon_isTrigMatched: Bool_t
+  muon_pfRelIso04_dBeta: Float_t
+  ele_isTrigMatched: Bool_t
+  tau_isTight: Bool_t
+  tau_decayModeFindingNewDMs: Bool_t
+  jet_isTightLepVeto: Bool_t
+  trk_pt: Float_t
+  trk_eta: Float_t
+  vtx_ndof: Float_t
+
+Branch-policy validation:
+  Command:
+    python3 DisplacedLeptonsSupplement/CustomNanoAOD/validation/check_disapptrks_branch_policy.py --nano /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/test_outputs/disapptrks_run2022F_muon_skim_max350_dlsfixed2_numEvent350.root --central-branches /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/AI_disTk/.porting/validation/schema_snapshots/central_nanoaod_run2022F.txt --output-json /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/validation/results/branch_policy_disapptrks_run2022F_muon_skim_max350_dlsfixed2.json
+  Result:
+    status: PASS
+    disallowed_duplicate_count: 0
+    expected_disapptrks_additions_missing: []
+    expected_disapptrks_additions_present:
+      ele_isTrigMatched
+      jet_isTightLepVeto
+      metNoMu_phi
+      metNoMu_pt
+      muon_isTrigMatched
+      muon_pfRelIso04_dBeta
+      tau_decayModeFindingNewDMs
+      tau_isTight
+    n_trk_branches: 118
+    n_vtx_branches: 12
+
+MiniAOD comparison:
+  Command:
+    python3 DisplacedLeptonsSupplement/CustomNanoAOD/validation/compare_disapptrks_miniaod_first10.py --miniaod /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/AI_disTk/local_samples/run2022F/miniaod.root --nano /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/test_outputs/disapptrks_run2022F_muon_skim_max350_dlsfixed2_numEvent350.root --events 10 --output-json /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/validation/results/compare_miniaod_first10_disapptrks_run2022F_muon_skim_max350_dlsfixed2.json
+  Matching method:
+    first 10 output NanoAOD events matched back to MiniAOD by (run, luminosityBlock, event)
+  Result:
+    status: PASS
+    matched_events: 10
+    checked_values: 370
+    failures: 0
+
+Large-output policy:
+  No large output was created.
+  The successful output is a small local smoke-test file, not a /store/group production test.
