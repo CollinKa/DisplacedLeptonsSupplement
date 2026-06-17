@@ -95,6 +95,42 @@ Dry-run inspection should verify:
 - generated NanoAOD configs use `124X_dataRun3_v15`
 - Run2022C/D generated NanoAOD configs use the pre-EE muon trigger-object matching filter ending in `Filtered0p08`
 
+## Compatibility Notes
+
+`ApplyDisappTrksRun3MiniAODCompatibility` currently removes `lhcInfoTable` from `nanoSequence` and `nanoSequenceOnlyData`. This was done because the 2022 C/D MiniAOD pilot failed when `lhcInfoTable` tried to read `LHCInfoPerLSRcd`, which was not available in that running context. This is a production-compatibility workaround, not a physics requirement of the disappearing-track analysis. If a future CMSSW/input setup provides the needed record, or if luminosity-section LHC information is needed, this table should be re-enabled through an explicit option in the compatibility customizer.
+
+The same compatibility customizer also narrows the standard `jetTable` to `Jet_pt`, `Jet_eta`, and `Jet_phi` and removes standard b/c regression modules that needed unavailable MiniAOD user floats. It does not apply the old `DisappTrks_v2` explicit JEC machinery.
+
+For the current DLS trigger-trimmed NanoAOD production, jet kinematics follow the standard NanoAOD/global-tag path from the generated CMSSW config:
+
+```text
+124X_dataRun3_v15
+```
+
+I did not port the old `DisappTrks_v2` JEC path that passed explicit files like:
+
+```text
+DisappTrks_v2/data/JecConfigAK4.json
+DisappTrks_v2/data/jer_smear.json.gz
+```
+
+and then ran producers such as:
+
+```text
+jecAppliedJetProducer
+jecAppliedMetProducer
+```
+
+For 2022 pre-EE data, that old config points at payload names such as:
+
+```text
+Summer22_22Sep2023_V4_DATA_L1FastJet_AK4PFPuppi
+Summer22_22Sep2023_V4_DATA_L2Relative_AK4PFPuppi
+Summer22_22Sep2023_V4_DATA_L2L3Residual_AK4PFPuppi
+```
+
+So the current submitted DLS C/D jobs do not use the explicit AI_disTk/DisappTrks_v2 JEC versioning. They use the DLS/cmsDriver/global-tag NanoAOD behavior.
+
 After dry-run inspection passes, submit with:
 
 ```bash

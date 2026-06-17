@@ -176,6 +176,14 @@ CRAB and config-generation validation:
     - Updated make_nano_configs.py so disapptrks configs apply the Run3 MiniAOD compatibility customizer after cmsDriver generation.
     - Updated generated submit_all.sh creation to cd to its own directory before calling crab submit, because the CRAB configs use basename psetName entries.
 
+  Compatibility notes recorded after user review:
+    - lhcInfoTable removal is a Run3 MiniAOD compatibility workaround, not a disappearing-track physics requirement.
+    - If a future CMSSW/input setup provides LHCInfoPerLSRcd, or if lumi-section LHC information is needed, lhcInfoTable should be re-enabled through an explicit option in ApplyDisappTrksRun3MiniAODCompatibility.
+    - The submitted DLS trigger-trimmed NanoAOD jobs do not use the old DisappTrks_v2 explicit JEC path.
+    - Current DLS generated configs use global tag 124X_dataRun3_v15 and the standard NanoAOD/global-tag jet path, with jetTable narrowed to Jet_pt, Jet_eta, and Jet_phi.
+    - The old DisappTrks_v2 path used explicit files such as DisappTrks_v2/data/JecConfigAK4.json and jer_smear.json.gz plus jecAppliedJetProducer/jecAppliedMetProducer.
+    - For 2022 pre-EE data, that old JecConfigAK4.json points to Summer22_22Sep2023_V4_DATA_L1FastJet_AK4PFPuppi, Summer22_22Sep2023_V4_DATA_L2Relative_AK4PFPuppi, and Summer22_22Sep2023_V4_DATA_L2L3Residual_AK4PFPuppi.
+
   Local pilot samples:
     Run2022C input:
       /store/data/Run2022C/Muon/MINIAOD/22Sep2023-v1/50000/c5509051-eba0-404d-a18d-40f60e42b418.root
