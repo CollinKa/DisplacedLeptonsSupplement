@@ -1,0 +1,168 @@
+2026-06-17 DLS-only PCAS for trigger-trimmed disappTrks NanoAOD
+
+Source copied from:
+  /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/AI_disTk/PocketCoffea
+
+Destination added in DisplacedLeptonsSupplement:
+  CustomNanoAOD/pocketcoffea_pveto
+
+Scope:
+  The copied Pveto PCAS now targets DLS trigger-trimmed NanoAOD only.
+  It intentionally does not support the old AI_disTk lowercase duplicate branch schema.
+
+Lowercase duplicate branch requirements removed from PCAS:
+  muon_pt
+  muon_eta
+  muon_phi
+  muon_charge
+  muon_isTight
+  jet_pt
+  jet_eta
+  jet_phi
+  ele_pt
+  ele_eta
+  ele_phi
+  ele_isTight
+  tau_eta
+  tau_phi
+
+Central NanoAOD branches used instead:
+  Muon_pt
+  Muon_eta
+  Muon_phi
+  Muon_charge
+  Muon_tightId
+  Jet_pt
+  Jet_eta
+  Jet_phi
+  Electron_eta
+  Electron_phi
+  HLT_IsoMu24
+
+Custom DLS additions kept as required PCAS inputs:
+  muon_isTrigMatched
+  jet_isTightLepVeto
+  metNoMu_pt
+  metNoMu_phi
+  trk_pt
+  trk_eta
+  trk_phi
+  trk_theta
+  trk_charge
+  trk_dxy
+  trk_dz
+  trk_missingInnerHits
+  trk_hitDrop_missingMiddleHits
+  trk_missingOuterHits
+  trk_relativePFIso
+  trk_caloTotNoPU
+  trk_hp_numberOfValidPixelHits
+  trk_hp_trackerLayersWithMeasurement
+
+Intentional branch-policy decisions:
+  - Keep lowercase names only for genuinely custom DLS additions.
+  - Do not request duplicated object kinematics if central NanoAOD already provides them.
+  - Require Electron_eta and Electron_phi because the current Pveto core uses electron-track deltaR.
+  - If a DLS NanoAOD file lacks Electron_eta/Electron_phi, fail before processing with an explicit message that production must preserve central Electron coordinates or add a minimal non-duplicate solution.
+
+Trigger-trimmed NanoAOD interpretation:
+  - The Muon trigger skim keeps events passing HLT_IsoMu24_v* while making NanoAOD.
+  - PCAS uses the central unversioned event-level HLT_IsoMu24 branch as a sanity/selection bit in the resulting NanoAOD.
+  - Trigger-trimmed Muon output is valid for Pveto counting, but not for measuring the trigger efficiency denominator.
+
+Config-generation changes for 2022 Muon C/D:
+  - Added CustomNanoAOD/scripts/datasets/Data_2022_Muon_CD_MINIAOD.txt with MiniAOD inputs:
+      /Muon/Run2022C-22Sep2023-v1/MINIAOD
+      /Muon/Run2022D-22Sep2023-v1/MINIAOD
+  - Set data_2022 global tag to 124X_dataRun3_v15.
+  - Added a generated-config override for Run2022C/D disapptrks-muon-skim so muon_isTrigMatched uses:
+      hltL3crIsoL1sSingleMu22L1f0L2f10QL3f24QL3trkIsoFiltered0p08
+    This matches the pre-EE AI_disTk 2022 C/D custom NanoAOD configuration.
+  - CRAB output remains staged through CRAB:
+      config.Site.storageSite = 'T3_US_FNALLPC'
+      config.Data.outLFNDirBase = '/store/group/lpcdisapptrks/CollinTest'
+
+Validation commands and observed outputs:
+  Command:
+    python3 -m py_compile CustomNanoAOD/pocketcoffea_pveto/*.py CustomNanoAOD/scripts/make_nano_configs.py
+  Output:
+    PASS, no syntax errors.
+
+  Command:
+    apptainer exec -B /cvmfs:/cvmfs -B /uscms:/uscms -B /uscms_data:/uscms_data \
+      /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/cms-analysis/general/pocketcoffea:lxplus-el9-stable \
+      bash -lc 'cd /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement && \
+      python3 CustomNanoAOD/pocketcoffea_pveto/run_dls_trimmed_nanoaod_pveto.py \
+        --single-muon CustomNanoAOD/test_outputs/disapptrks_run2022F_muon_skim_max350_dlsfixed2_numEvent350.root \
+        --tree Events --layers all \
+        --json-output CustomNanoAOD/validation/results/dls_pveto_smoke/pveto_summary.json \
+        --output CustomNanoAOD/validation/results/dls_pveto_smoke/pveto_counts.root'
+  Output:
+    Expected schema preflight failure on the existing DLS smoke file:
+      Required branch Electron_eta not found.
+      Required branch Electron_phi not found.
+    The full error message says the DLS trimmed NanoAOD should preserve the central Electron table coordinates, or add a minimal non-duplicate electron-coordinate solution.
+  Interpretation:
+    PASS for missing-branch behavior.
+    BLOCKED for producing pveto_summary.json from this particular smoke file because the file lacks Electron_eta/Electron_phi.
+
+CRAB and config-generation validation:
+  Command:
+    crab checkwrite --site=T3_US_FNALLPC --lfn=/store/group/lpcdisapptrks/CollinTest
+  Output:
+    Success: Able to write in /store/group/lpcdisapptrks/CollinTest on site T3_US_FNALLPC.
+
+  Command:
+    python3 CustomNanoAOD/scripts/make_nano_configs.py \
+      CustomNanoAOD/scripts/datasets/Data_2022_Muon_CD_MINIAOD.txt \
+      --output-dir CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022 \
+      --customize disapptrks-muon-skim \
+      --out-lfn-dir-base /store/group/lpcdisapptrks/CollinTest
+  Output:
+    Created:
+      CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/Muon_Run2022C_disapptrks_muon_skim_NANO.py
+      CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/Muon_Run2022D_disapptrks_muon_skim_NANO.py
+      CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/crab_Muon_Run2022C_disapptrks_muon_skim.py
+      CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/crab_Muon_Run2022D_disapptrks_muon_skim.py
+      CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/submit_all.sh
+
+  CRAB config inspection:
+    PASS: inputDataset is /Muon/Run2022C-22Sep2023-v1/MINIAOD.
+    PASS: inputDataset is /Muon/Run2022D-22Sep2023-v1/MINIAOD.
+    PASS: config.Data.outLFNDirBase is /store/group/lpcdisapptrks/CollinTest/Run2022/.
+    PASS: config.Site.storageSite is T3_US_FNALLPC.
+    PASS: config.Data.lumiMask uses Cert_Collisions2022_355100_362760_Golden.json.
+
+  Expanded CMSSW config inspection:
+    Command:
+      edmConfigDump CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/Muon_Run2022C_disapptrks_muon_skim_NANO.py | rg -n "HLTHighLevel|SelectEvents|HLT_IsoMu24|Filtered0p08"
+    Output:
+      PASS: disappTrkTable.triggerFilterName is hltL3crIsoL1sSingleMu22L1f0L2f10QL3f24QL3trkIsoFiltered0p08.
+      PASS: disappTrksMuonTriggerFilter is an HLTHighLevel EDFilter.
+      PASS: HLTPaths is HLT_IsoMu24_v*.
+      PASS: NANOAODoutput.SelectEvents selects nanoAOD_step.
+      PASS: nanoAOD_step begins with disappTrksMuonTriggerFilter.
+    Command:
+      edmConfigDump CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/Muon_Run2022D_disapptrks_muon_skim_NANO.py | rg -n "HLTHighLevel|SelectEvents|HLT_IsoMu24|Filtered0p08"
+    Output:
+      Same PASS checks as Run2022C.
+
+  DAS scale check:
+    /Muon/Run2022C-22Sep2023-v1/MINIAOD:
+      nevents = 138329693
+      nfiles = 1768
+      file_size = 6290310115400 bytes
+    /Muon/Run2022D-22Sep2023-v1/MINIAOD:
+      nevents = 75440027
+      nfiles = 1001
+      file_size = 3429329022304 bytes
+    Existing trigger-skim smoke file:
+      file size = 3.3 MB
+      output Events entries = 30
+      source maxEvents = 350
+    Submission status:
+      Not submitted in this pass. The naive full C/D extrapolation is order TB and may exceed the prior 200 GB large-test threshold. Full CRAB submission should wait for explicit approval of that scale, or a smaller pilot submission with bounded unitsPerJob/totalUnits.
+
+Known limitations:
+  - The existing DLS smoke file disapptrks_run2022F_muon_skim_max350_dlsfixed2_numEvent350.root was produced with the standard Electron table disabled. It is expected to fail the new PCAS preflight until Electron_eta and Electron_phi are present.
+  - This PCAS copy is for DLS trigger-trimmed NanoAOD only; old AI_disTk lowercase duplicate schema support was intentionally removed.

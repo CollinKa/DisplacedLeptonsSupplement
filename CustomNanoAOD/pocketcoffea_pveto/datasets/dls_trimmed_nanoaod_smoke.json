@@ -1,0 +1,17 @@
+{
+  "DATA_Muon_Run2022F_DLS_TrimmedNanoAOD_Smoke": {
+    "files": [
+      "/uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/test_outputs/disapptrks_run2022F_muon_skim_max350_dlsfixed2_numEvent350.root"
+    ],
+    "metadata": {
+      "era": "F",
+      "isMC": "False",
+      "nano_version": 15,
+      "nevents": 30,
+      "primaryDataset": "Muon",
+      "sample": "DATA_Muon",
+      "source": "DLS trigger-skim smoke test",
+      "year": "2022"
+    }
+  }
+}

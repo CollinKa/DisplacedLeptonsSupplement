@@ -4,3 +4,4 @@ __pycache__
 crab_projects/
 CustomNanoAOD/test_outputs/
 CustomNanoAOD/validation/results/
+CustomNanoAOD/generated_configs/

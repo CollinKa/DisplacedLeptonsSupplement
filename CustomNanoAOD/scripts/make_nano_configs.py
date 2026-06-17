@@ -79,18 +79,20 @@ CAMPAIGN_ARGS = {
         "era": "Run3_2023",
         "label": "Run2023",
     },
-    # Run 3 2022 -- TODO: fill in correct conditions
+    # Run 3 2022
     "Run3Summer22": {
         "conditions": "<TODO: 2022 MC conditions>",
         "era": "Run3",
         "label": "MC_2022",
     },
     "data_2022": {
-        "conditions": "<TODO: 2022 data conditions>",
+        "conditions": "124X_dataRun3_v15",
         "era": "Run3",
         "label": "Run2022",
     },
 }
+
+RUN2022_PRE_EE_MUON_TRIGGER_FILTER = "hltL3crIsoL1sSingleMu22L1f0L2f10QL3f24QL3trkIsoFiltered0p08"
 
 # Golden lumi JSON paths for each run year.
 GOLDEN_JSONS = {
@@ -262,7 +264,19 @@ def _sanitize_label(label: str) -> str:
     return re.sub(r"[^A-Za-z0-9_]+", "_", label).strip("_")
 
 
-def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_name: str, customize: str) -> tuple:
+def _extra_disapptrks_customise_command(dataset: str, customize: str) -> str:
+    """Return dataset-specific overrides for disappTrks custom NanoAOD configs."""
+    if customize != "disapptrks-muon-skim":
+        return ""
+    if re.search(r"^/Muon/Run2022[CD]-", dataset):
+        return (
+            "process.disappTrkTable.triggerFilterName = "
+            "cms.string('{}')".format(RUN2022_PRE_EE_MUON_TRIGGER_FILTER)
+        )
+    return ""
+
+
+def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_name: str, customize: str, dataset: str) -> tuple:
     """
     Apply our customizations to the base cmsDriver args.
     Returns (shell_command_string, input_dataset_string, num_cores).
@@ -277,6 +291,9 @@ def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_nam
     tokens = _set_arg(tokens, "--step", "NANO")
     tokens = _append_to_arg(tokens, "--customise", CUSTOMIZE_OPTIONS[customize], ",")
     tokens = _append_to_arg(tokens, "--customise_command", CUSTOM_COMMAND, "; ")
+    extra_command = _extra_disapptrks_customise_command(dataset, customize)
+    if extra_command:
+        tokens = _append_to_arg(tokens, "--customise_command", extra_command, "; ")
     tokens = _set_arg(tokens, "--eventcontent", "NANOAOD" if data else "NANOAODSIM")
 
     filein = _get_arg(tokens, "--filein") or ""
@@ -344,7 +361,7 @@ def process_dataset(
     data = is_data(miniaod)
 
     base_args = build_base_cmsdriver_args(miniaod, data)
-    cmd, input_dataset, num_cores = build_cmsdriver_cmd(base_args, cfg_path, data, short_name, customize)
+    cmd, input_dataset, num_cores = build_cmsdriver_cmd(base_args, cfg_path, data, short_name, customize, miniaod)
 
     print("  Running cmsDriver.py...")
     print(f"    {cmd[:120]}{'...' if len(cmd) > 120 else ''}")
