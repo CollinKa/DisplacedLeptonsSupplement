@@ -25,9 +25,12 @@ def DropUnneededTasks(process):
         # Run 3
         for name in [
             "photonTablesTask",
+            "photonTask",
             "metTablesTask",
             "tauTablesTask",
+            "tauTask",
             "boostedTauTablesTask",
+            "boostedTauTask",
             "jetPuppiTablesTask",
             "jetAK8TablesTask",
             "jetConstituentsTablesTask",
@@ -54,6 +57,136 @@ def DropUnneededTasks(process):
                             getattr(process, seq_name).remove(getattr(process, name))
                         except Exception:
                             pass  # not present in this sequence or already excluded by era modifier
+
+    return process
+
+
+def _remove_module_from_sequence(process, sequence_name, module_name):
+    if not hasattr(process, sequence_name) or not hasattr(process, module_name):
+        return
+    try:
+        getattr(process, sequence_name).remove(getattr(process, module_name))
+    except Exception:
+        pass
+
+
+def _remove_module_from_task(process, task_name, module_name):
+    if not hasattr(process, task_name) or not hasattr(process, module_name):
+        return
+    try:
+        getattr(process, task_name).remove(getattr(process, module_name))
+    except Exception:
+        pass
+
+
+def _keep_only_pset_parameters(pset, keep):
+    keep = set(keep)
+    for name in list(pset.parameters_().keys()):
+        if name not in keep:
+            delattr(pset, name)
+
+
+def ApplyDisappTrksRun3MiniAODCompatibility(process):
+    """
+    Remove optional standard NanoAOD pieces that are incompatible with the
+    Run 3 MiniAOD samples used for disappTrks custom NanoAOD production.
+
+    This keeps the standard Muon, Electron, Jet, Vertex, and IsoTrack tables
+    needed by downstream DLS NanoAOD analysis while avoiding known CMSSW15
+    failures from LHCInfo, optional PUPPI jet columns, and unavailable
+    electron VID value maps.
+    """
+    process = DropUnneededTasks(process)
+
+    if hasattr(process, "nanoTableTaskCommon"):
+        for task_name in ("jetTask", "jetTablesTask"):
+            if hasattr(process, task_name):
+                process.nanoTableTaskCommon.add(getattr(process, task_name))
+
+    for sequence_name in ("nanoSequence", "nanoSequenceOnlyData"):
+        _remove_module_from_sequence(process, sequence_name, "lhcInfoTable")
+
+    if hasattr(process, "jetPuppiTable") and hasattr(process.jetPuppiTable.variables, "puIdDisc"):
+        del process.jetPuppiTable.variables.puIdDisc
+    if hasattr(process, "jetTable"):
+        _keep_only_pset_parameters(process.jetTable.variables, ("pt", "eta", "phi"))
+        if hasattr(process.jetTable, "externalVariables"):
+            _keep_only_pset_parameters(process.jetTable.externalVariables, ())
+    for module_name in ("bjetNN", "cjetNN"):
+        _remove_module_from_task(process, "jetTablesTask", module_name)
+
+    if hasattr(process, "linkedObjects"):
+        for name, tag in (
+            ("boostedTaus", "slimmedTaus"),
+            ("photons", "slimmedPhotons"),
+            ("taus", "slimmedTaus"),
+        ):
+            if hasattr(process.linkedObjects, name):
+                setattr(process.linkedObjects, name, cms.InputTag(tag))
+
+    for module_name in ("bitmapVIDForEle", "bitmapVIDForEleFall17V2", "bitmapVIDForEleHEEP"):
+        _remove_module_from_task(process, "electronTask", module_name)
+    _remove_module_from_task(process, "electronTablesTask", "electronPROMPTMVA")
+
+    if hasattr(process, "slimmedElectronsWithUserData"):
+        for name in (
+            "mvaIso_Fall17V2",
+            "mvaNoIso_Fall17V2",
+            "mvaIso",
+            "mvaNoIso",
+            "mvaHZZIso",
+        ):
+            if hasattr(process.slimmedElectronsWithUserData.userFloats, name):
+                delattr(process.slimmedElectronsWithUserData.userFloats, name)
+        for name in (
+            "mvaIso_Fall17V2_WP90",
+            "mvaIso_Fall17V2_WP80",
+            "mvaIso_Fall17V2_WPL",
+            "mvaIso_WP90",
+            "mvaIso_WP80",
+            "mvaNoIso_Fall17V2_WP90",
+            "mvaNoIso_Fall17V2_WP80",
+            "mvaNoIso_Fall17V2_WPL",
+            "mvaNoIso_WP90",
+            "mvaNoIso_WP80",
+            "mvaIso_WPHZZ",
+            "cutBasedID_veto",
+            "cutBasedID_loose",
+            "cutBasedID_medium",
+            "cutBasedID_tight",
+            "cutBasedID_Fall17V2_veto",
+            "cutBasedID_Fall17V2_loose",
+            "cutBasedID_Fall17V2_medium",
+            "cutBasedID_Fall17V2_tight",
+            "cutBasedID_HEEP",
+        ):
+            if hasattr(process.slimmedElectronsWithUserData.userIntFromBools, name):
+                delattr(process.slimmedElectronsWithUserData.userIntFromBools, name)
+        for name in ("VIDNestedWPBitmap", "VIDNestedWPBitmap_Fall17V2", "VIDNestedWPBitmapHEEP"):
+            if hasattr(process.slimmedElectronsWithUserData.userInts, name):
+                delattr(process.slimmedElectronsWithUserData.userInts, name)
+
+    if hasattr(process, "electronTable"):
+        if hasattr(process.electronTable, "externalVariables") and hasattr(process.electronTable.externalVariables, "promptMVA"):
+            delattr(process.electronTable.externalVariables, "promptMVA")
+        for name in (
+            "cutBased",
+            "cutBased_Fall17V2",
+            "cutBased_HEEP",
+            "mvaIso",
+            "mvaIso_WP80",
+            "mvaIso_WP90",
+            "mvaNoIso",
+            "mvaNoIso_WP80",
+            "mvaNoIso_WP90",
+            "mvaHZZIso",
+            "mvaIso_WPHZZ",
+            "promptMVA",
+            "vidNestedWPBitmap",
+            "vidNestedWPBitmapHEEP",
+        ):
+            if hasattr(process.electronTable.variables, name):
+                delattr(process.electronTable.variables, name)
 
     return process
 

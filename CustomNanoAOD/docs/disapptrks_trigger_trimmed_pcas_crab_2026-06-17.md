@@ -98,23 +98,129 @@ Dry-run inspection should verify:
 After dry-run inspection passes, submit with:
 
 ```bash
-bash CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/submit_all.sh
+cd /uscms/home/czheng/nobackup/CMSSW_15_0_10/src
+cmsenv
+cd DisplacedLeptonsSupplement/CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022
+bash submit_all.sh
 ```
 
-In the 2026-06-17 dry run, the configs passed inspection but full C/D submission was not launched because the scale check suggested the output could be order TB:
+The generated `submit_all.sh` intentionally changes into its own directory before running `crab submit`, because the CRAB configs use basename `psetName` values.
+
+## 2026-06-17 Pilot Measurement And Submission
+
+After explicit approval to do a small pilot output-size measurement and submit the Era C/D production jobs, I ran 1000-input-event local pilots from one MiniAOD file per era.
+
+Run2022C pilot:
+
+- input: `/store/data/Run2022C/Muon/MINIAOD/22Sep2023-v1/50000/c5509051-eba0-404d-a18d-40f60e42b418.root`
+- output: `CustomNanoAOD/test_outputs/pilot_20260617_muon_cd/pilot_Run2022C_disapptrks_muon_skim_fixed6_1000.root`
+- processed input events: 1000
+- output events after `HLT_IsoMu24_v*` skim: 539
+- output size: 5,155,436 bytes, shown by `ls` as 5.0M
+- runtime: 99.82 seconds real time
+
+Run2022D pilot:
+
+- input: `/store/data/Run2022D/Muon/MINIAOD/22Sep2023-v1/2520000/77b001b7-7d84-4544-a932-2960748112d1.root`
+- output: `CustomNanoAOD/test_outputs/pilot_20260617_muon_cd/pilot_Run2022D_disapptrks_muon_skim_fixed6_1000.root`
+- processed input events: 1000
+- output events after `HLT_IsoMu24_v*` skim: 508
+- output size: 4,999,439 bytes, shown by `ls` as 4.8M
+- runtime: 218.49 seconds real time
+
+Both pilot files contain the required DLS-trimmed NanoAOD branches:
+
+```text
+Electron_eta
+Electron_phi
+Muon_pt
+Jet_pt
+Jet_eta
+Jet_phi
+trk_pt
+metNoMu_pt
+muon_isTrigMatched
+jet_isTightLepVeto
+HLT_IsoMu24
+```
+
+The central MiniAOD input sizes are not a local or group-storage requirement. CRAB reads the MiniAOD from CMS data storage. The group storage cost is the produced NanoAOD output.
+
+Using the 1000-event pilots as a first-file estimate:
 
 - `/Muon/Run2022C-22Sep2023-v1/MINIAOD`: 138,329,693 events, 1,768 files, 6.29 TB input
 - `/Muon/Run2022D-22Sep2023-v1/MINIAOD`: 75,440,027 events, 1,001 files, 3.43 TB input
-- existing trigger-skim smoke output: 3.3 MB for 30 output events from 350 processed events
+- estimated Run2022C output: about 713 GB decimal
+- estimated Run2022D output: about 377 GB decimal
+- estimated combined output: about 1.09 TB decimal
 
-That extrapolation is too large to treat as a sub-200 GB validation test. Full submission should wait for explicit approval of that output scale, or use a bounded pilot CRAB config first.
+This is a pilot estimate, not a final accounting. The output can vary across files because event content and trigger acceptance vary.
+
+The full CRAB tasks were submitted from:
+
+```bash
+cd /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022
+crab submit crab_Muon_Run2022C_disapptrks_muon_skim.py
+crab submit crab_Muon_Run2022D_disapptrks_muon_skim.py
+```
+
+Run2022C task:
+
+```text
+260617_050505:hazheng_crab_Muon_Run2022C_disapptrks_muon_skim_customNanoAOD
+```
+
+Project directory:
+
+```text
+/uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/crab_projects/crab_Muon_Run2022C_disapptrks_muon_skim_customNanoAOD
+```
+
+Immediate status after submission:
+
+```text
+SUBMITTED
+```
+
+Run2022D task:
+
+```text
+260617_050550:hazheng_crab_Muon_Run2022D_disapptrks_muon_skim_customNanoAOD
+```
+
+Project directory:
+
+```text
+/uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/crab_projects/crab_Muon_Run2022D_disapptrks_muon_skim_customNanoAOD
+```
+
+Immediate status after submission:
+
+```text
+QUEUED on command SUBMIT
+```
+
+There was one failed submit attempt from the repo root before the `submit_all.sh` path handling was fixed. That attempt failed because CRAB could not find the basename `psetName` from the wrong working directory. It left a partial local work area at:
+
+```text
+/uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/crab_projects/crab_Muon_Run2022C_disapptrks_muon_skim_customNanoAOD
+```
+
+`crab status` reported that this directory has no `.requestcache`, so it is not a registered CRAB task. It was not deleted.
 
 Track runtime with:
 
 ```bash
+cd /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022
 crab status -d crab_projects/crab_Muon_Run2022C_disapptrks_muon_skim_customNanoAOD
 crab status -d crab_projects/crab_Muon_Run2022D_disapptrks_muon_skim_customNanoAOD
 ```
+
+Final status snapshot from this pass:
+
+- Run2022C: CRAB server `SUBMITTED`, scheduler `SUBMITTED`, 252/256 jobs idle and 4/256 running.
+- Run2022D: CRAB server `SUBMITTED`, scheduler `SUBMITTED`, 17/149 jobs running and 132/149 unsubmitted.
+- Both tasks request 3000 MB; CRAB warns that only 2500 MB is guaranteed at many sites, so the first failures or holds should be checked for memory pressure.
 
 ## Relation To DisplacedLeptonsSupplement
 

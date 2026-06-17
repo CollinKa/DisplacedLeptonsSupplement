@@ -147,7 +147,7 @@ CRAB and config-generation validation:
     Output:
       Same PASS checks as Run2022C.
 
-  DAS scale check:
+  DAS scale check before full submission:
     /Muon/Run2022C-22Sep2023-v1/MINIAOD:
       nevents = 138329693
       nfiles = 1768
@@ -160,9 +160,116 @@ CRAB and config-generation validation:
       file size = 3.3 MB
       output Events entries = 30
       source maxEvents = 350
-    Submission status:
-      Not submitted in this pass. The naive full C/D extrapolation is order TB and may exceed the prior 200 GB large-test threshold. Full CRAB submission should wait for explicit approval of that scale, or a smaller pilot submission with bounded unitsPerJob/totalUnits.
+    Initial submission status:
+      Not submitted in that pass. The first scale estimate was order TB, so full CRAB submission waited for explicit approval.
+
+2026-06-17 continuation after explicit approval:
+  User approved a small pilot output-size measurement and full Run2022C/D Muon CRAB submission.
+
+  Source/config fixes made before production pilot:
+    - Added ApplyDisappTrksRun3MiniAODCompatibility in CustomNanoAOD/python/custom_displaced_leptons_cff.py.
+    - Removed lhcInfoTable from nanoSequence and nanoSequenceOnlyData scheduling to avoid LHCInfoPerLSRcd failures on Run2022 MiniAOD.
+    - Removed optional photon, tau, and boosted-tau standard NanoAOD tasks from the disappTrks production path.
+    - Pointed linkedObjects optional collections at slimmedTaus and slimmedPhotons.
+    - Removed electron PROMPT MVA and VID/userData dependencies that were unavailable in the 2022 MiniAOD test input while preserving the central Electron table coordinates.
+    - Explicitly re-added a minimal central Jet table and narrowed it to Jet_pt, Jet_eta, and Jet_phi; removed b/c regression tasks and externalVariables that required unavailable user floats.
+    - Updated make_nano_configs.py so disapptrks configs apply the Run3 MiniAOD compatibility customizer after cmsDriver generation.
+    - Updated generated submit_all.sh creation to cd to its own directory before calling crab submit, because the CRAB configs use basename psetName entries.
+
+  Local pilot samples:
+    Run2022C input:
+      /store/data/Run2022C/Muon/MINIAOD/22Sep2023-v1/50000/c5509051-eba0-404d-a18d-40f60e42b418.root
+    Run2022C command:
+      cmsRun CustomNanoAOD/test_outputs/pilot_20260617_muon_cd/pilot_Run2022C_disapptrks_muon_skim_NANO.py
+    Run2022C output:
+      CustomNanoAOD/test_outputs/pilot_20260617_muon_cd/pilot_Run2022C_disapptrks_muon_skim_fixed6_1000.root
+    Run2022C log:
+      CustomNanoAOD/test_outputs/pilot_20260617_muon_cd/pilot_Run2022C_disapptrks_muon_skim_fixed6_1000.log
+    Run2022C result:
+      Processed 1000 input events successfully in real 99.82 seconds.
+      Output Events entries = 539.
+      Output size = 5,155,436 bytes, shown by ls as 5.0M.
+
+    Run2022D input:
+      /store/data/Run2022D/Muon/MINIAOD/22Sep2023-v1/2520000/77b001b7-7d84-4544-a932-2960748112d1.root
+    Run2022D command:
+      cmsRun CustomNanoAOD/test_outputs/pilot_20260617_muon_cd/pilot_Run2022D_disapptrks_muon_skim_NANO.py
+    Run2022D output:
+      CustomNanoAOD/test_outputs/pilot_20260617_muon_cd/pilot_Run2022D_disapptrks_muon_skim_fixed6_1000.root
+    Run2022D log:
+      CustomNanoAOD/test_outputs/pilot_20260617_muon_cd/pilot_Run2022D_disapptrks_muon_skim_fixed6_1000.log
+    Run2022D result:
+      Processed 1000 input events successfully in real 218.49 seconds.
+      Output Events entries = 508.
+      Output size = 4,999,439 bytes, shown by ls as 4.8M.
+
+  Pilot branch checks:
+    Checked both pilot files for:
+      Electron_eta, Electron_phi, Muon_pt, Jet_pt, Jet_eta, Jet_phi,
+      trk_pt, metNoMu_pt, muon_isTrigMatched, jet_isTightLepVeto, HLT_IsoMu24.
+    Result:
+      PASS: all listed branches were present in both Run2022C and Run2022D pilot outputs.
+
+  Output-size estimate from the 1000-event pilots:
+    Run2022C:
+      5,155,436 bytes / 1000 processed input events * 138,329,693 DAS events
+      approximately 713 GB decimal output.
+    Run2022D:
+      4,999,439 bytes / 1000 processed input events * 75,440,027 DAS events
+      approximately 377 GB decimal output.
+    Combined estimate:
+      approximately 1.09 TB decimal output.
+    Interpretation:
+      This is a first-file pilot estimate, not a final storage accounting. The input MiniAOD remains on CMS storage and is streamed by CRAB; only the produced NanoAOD output is staged to the group area.
+
+  CRAB submission:
+    First submit attempt:
+      bash CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/submit_all.sh
+    Result:
+      FAILED from repo root because crab could not find basename psetName Muon_Run2022C_disapptrks_muon_skim_NANO.py.
+      A partial local work area was left at:
+        /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/crab_projects/crab_Muon_Run2022C_disapptrks_muon_skim_customNanoAOD
+      crab status reported that the directory had no .requestcache, so it is not a registered CRAB task. It was not deleted.
+
+    Successful submission commands:
+      cd /uscms/home/czheng/nobackup/CMSSW_15_0_10/src
+      cmsenv
+      cd DisplacedLeptonsSupplement/CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022
+      crab submit crab_Muon_Run2022C_disapptrks_muon_skim.py
+      crab submit crab_Muon_Run2022D_disapptrks_muon_skim.py
+
+    Run2022C CRAB task:
+      Task name: 260617_050505:hazheng_crab_Muon_Run2022C_disapptrks_muon_skim_customNanoAOD
+      Project dir:
+        /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/crab_projects/crab_Muon_Run2022C_disapptrks_muon_skim_customNanoAOD
+      Status after submission:
+        SUBMITTED
+
+    Run2022D CRAB task:
+      Task name: 260617_050550:hazheng_crab_Muon_Run2022D_disapptrks_muon_skim_customNanoAOD
+      Project dir:
+        /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022/crab_projects/crab_Muon_Run2022D_disapptrks_muon_skim_customNanoAOD
+      Status after submission:
+        QUEUED on command SUBMIT
+
+    Status commands:
+      cd /uscms/home/czheng/nobackup/CMSSW_15_0_10/src/DisplacedLeptonsSupplement/CustomNanoAOD/generated_configs/disapptrks_muon_cd_2022
+      crab status -d crab_projects/crab_Muon_Run2022C_disapptrks_muon_skim_customNanoAOD
+      crab status -d crab_projects/crab_Muon_Run2022D_disapptrks_muon_skim_customNanoAOD
+
+    Final status snapshot in this pass:
+      Run2022C:
+        Status on CRAB server: SUBMITTED
+        Status on scheduler: SUBMITTED
+        Jobs: 252/256 idle, 4/256 running.
+        Warning: task requests 3000 MB; CRAB guarantees only 2500 MB at many sites.
+      Run2022D:
+        Status on CRAB server: SUBMITTED
+        Status on scheduler: SUBMITTED
+        Jobs: 17/149 running, 132/149 unsubmitted.
+        Warning: task requests 3000 MB; CRAB guarantees only 2500 MB at many sites.
 
 Known limitations:
   - The existing DLS smoke file disapptrks_run2022F_muon_skim_max350_dlsfixed2_numEvent350.root was produced with the standard Electron table disabled. It is expected to fail the new PCAS preflight until Electron_eta and Electron_phi are present.
   - This PCAS copy is for DLS trigger-trimmed NanoAOD only; old AI_disTk lowercase duplicate schema support was intentionally removed.
+  - The 2022 C/D CRAB configs request 3000 MB; CRAB warned for Run2022C that only 2500 MB is guaranteed at many sites. Monitor first jobs for memory holds or failures.

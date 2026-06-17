@@ -266,14 +266,21 @@ def _sanitize_label(label: str) -> str:
 
 def _extra_disapptrks_customise_command(dataset: str, customize: str) -> str:
     """Return dataset-specific overrides for disappTrks custom NanoAOD configs."""
+    commands = []
+    if customize.startswith("disapptrks"):
+        commands.append(
+            "from DisplacedLeptonsSupplement.CustomNanoAOD.custom_displaced_leptons_cff "
+            "import ApplyDisappTrksRun3MiniAODCompatibility; "
+            "process = ApplyDisappTrksRun3MiniAODCompatibility(process)"
+        )
     if customize != "disapptrks-muon-skim":
-        return ""
+        return "; ".join(commands)
     if re.search(r"^/Muon/Run2022[CD]-", dataset):
-        return (
+        commands.append(
             "process.disappTrkTable.triggerFilterName = "
             "cms.string('{}')".format(RUN2022_PRE_EE_MUON_TRIGGER_FILTER)
         )
-    return ""
+    return "; ".join(commands)
 
 
 def build_cmsdriver_cmd(original_args: str, cfg_path: str, data: bool, short_name: str, customize: str, dataset: str) -> tuple:
@@ -453,8 +460,10 @@ def main() -> None:
     submit_script = os.path.join(args.output_dir, "submit_all.sh")
     with open(submit_script, "w") as f:
         f.write("#!/bin/bash\nset -e\n\n")
+        f.write('SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n')
+        f.write('cd "$SCRIPT_DIR"\n\n')
         for p in crab_configs:
-            f.write(f"crab submit {p}\n")
+            f.write(f"crab submit {os.path.basename(p)}\n")
     os.chmod(submit_script, 0o755)
     print(f"Wrote submit script: {submit_script}")
 
