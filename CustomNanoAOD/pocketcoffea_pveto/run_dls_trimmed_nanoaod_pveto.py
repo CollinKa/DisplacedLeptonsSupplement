@@ -15,9 +15,10 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dls_pveto_core import (
-    PVETO_BRANCHES,
     empty_counts,
+    input_branches_for_available,
     missing_branch_message,
+    missing_required_for_available,
     make_payload,
     normalize_layers,
     process_arrays,
@@ -41,9 +42,11 @@ def run_file_set(files: list[str], tree: str, layers: list[str], chunk_size: str
     }
 
     for filename in files:
+        with uproot.open(f"{filename}:{tree}") as root_tree:
+            read_branches = input_branches_for_available(set(root_tree.keys()))
         for arrays in uproot.iterate(
             f"{filename}:{tree}",
-            PVETO_BRANCHES,
+            read_branches,
             step_size=chunk_size,
             library="ak",
         ):
@@ -64,7 +67,7 @@ def validate_file_schema(files: list[str], tree: str) -> None:
     for filename in files:
         with uproot.open(f"{filename}:{tree}") as root_tree:
             branches = set(root_tree.keys())
-        missing = [name for name in PVETO_BRANCHES if name not in branches]
+        missing = missing_required_for_available(branches)
         if missing:
             missing_by_file[filename] = missing
 

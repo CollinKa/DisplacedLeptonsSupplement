@@ -14,6 +14,45 @@ vector.register_awkward()
 MUON_MASS = 0.105658
 Z_MASS = 91.1876
 LAYERS = ("NLayers4", "NLayers5", "NLayers6plus", "combinedBins")
+MUON_TRIGGER_MATCHING_DR = 0.3
+MUON_TRIGOBJ_ID = 13
+MUON_ISOMU24_FILTER_BIT = 8
+
+# Canonical DLS names are kept in the analysis code.  The aliases let the same
+# Pveto code read OSUNano-style central branches without duplicating the logic.
+BRANCH_ALIASES = {
+    "metNoMu_pt": ("MetNoMu_pt",),
+    "metNoMu_phi": ("MetNoMu_phi",),
+    "trk_pt": ("IsoTrack_pt",),
+    "trk_eta": ("IsoTrack_eta",),
+    "trk_phi": ("IsoTrack_phi",),
+    "trk_theta": ("IsoTrack_theta",),
+    "trk_charge": ("IsoTrack_charge",),
+    "trk_dxy": ("IsoTrack_dxy",),
+    "trk_dz": ("IsoTrack_dz",),
+    "trk_missingInnerHits": ("IsoTrack_missingInnerHits",),
+    "trk_hitDrop_missingMiddleHits": ("IsoTrack_missingMiddleHits",),
+    "trk_missingOuterHits": ("IsoTrack_missingOuterHits",),
+    "trk_relativePFIso": ("IsoTrack_pfRelIso03_chg", "IsoTrack_pfRelIso03_all"),
+    "trk_hp_numberOfValidPixelHits": ("IsoTrack_hp_nValidPixelHits",),
+    "trk_hp_trackerLayersWithMeasurement": ("IsoTrack_hp_trackerLayersWithMeasurement",),
+}
+
+COMPUTED_BRANCH_REQUIREMENTS = {
+    "trk_caloTotNoPU": (
+        "IsoTrack_caloTotal",
+        "Rho_fixedGridRhoFastjetCentralCalo",
+    ),
+}
+
+OPTIONAL_BRANCHES = (
+    "muon_isTrigMatched",
+    "jet_isTightLepVeto",
+    "TrigObj_id",
+    "TrigObj_filterBits",
+    "TrigObj_eta",
+    "TrigObj_phi",
+)
 
 PVETO_BRANCHES = [
     "metNoMu_pt",
@@ -24,13 +63,11 @@ PVETO_BRANCHES = [
     "Muon_phi",
     "Muon_charge",
     "Muon_tightId",
-    "muon_isTrigMatched",
     "Electron_eta",
     "Electron_phi",
     "Jet_eta",
     "Jet_phi",
     "Jet_pt",
-    "jet_isTightLepVeto",
     "trk_pt",
     "trk_eta",
     "trk_phi",
@@ -50,6 +87,18 @@ PVETO_BRANCHES = [
 REQUIRED_BRANCHES = tuple(PVETO_BRANCHES)
 
 BRANCH_NOTES = {
+    "trk_caloTotNoPU": (
+        "For OSUNano inputs this is reconstructed from IsoTrack_caloTotal and "
+        "Rho_fixedGridRhoFastjetCentralCalo using the MattWIP ntuplizer formula "
+        "max(0, caloTotal - rhoCentralCalo * pi * 0.4^2)."
+    ),
+    "trk_hitDrop_missingMiddleHits": (
+        "For OSUNano inputs this maps to IsoTrack_missingMiddleHits."
+    ),
+    "trk_relativePFIso": (
+        "For OSUNano inputs this maps first to IsoTrack_pfRelIso03_chg, matching "
+        "the MattWIP ntuplizer charged-hadron DR03 relative isolation definition."
+    ),
     "Electron_eta": (
         "Electron_eta is required for the electron-track veto. The DLS trimmed "
         "NanoAOD should preserve the central Electron table coordinates, or a "
@@ -84,30 +133,103 @@ def normalize_layers(layer: str) -> list[str]:
     return list(LAYERS) if layer == "all" else [layer]
 
 
-def has_branch(arrays, name: str) -> bool:
+def branch_options(name: str) -> tuple[str, ...]:
+    return (name,) + BRANCH_ALIASES.get(name, ())
+
+
+def has_exact_branch(arrays, name: str) -> bool:
     if name in arrays.fields:
         return True
+    if "_" not in name:
+        return False
     collection, field = name.split("_", 1)
     return collection in arrays.fields and field in arrays[collection].fields
+
+
+def has_branch(arrays, name: str) -> bool:
+    if name in COMPUTED_BRANCH_REQUIREMENTS:
+        return all(has_exact_branch(arrays, req) for req in COMPUTED_BRANCH_REQUIREMENTS[name])
+    return any(has_exact_branch(arrays, option) for option in branch_options(name))
+
+
+def available_has_branch(available: set[str], name: str) -> bool:
+    if name in COMPUTED_BRANCH_REQUIREMENTS:
+        return all(req in available for req in COMPUTED_BRANCH_REQUIREMENTS[name])
+    return any(option in available for option in branch_options(name))
+
+
+def input_branches_for_available(available: set[str]) -> list[str]:
+    needed = []
+    for name in PVETO_BRANCHES:
+        if name in COMPUTED_BRANCH_REQUIREMENTS and name not in available:
+            if all(req in available for req in COMPUTED_BRANCH_REQUIREMENTS[name]):
+                needed.extend(COMPUTED_BRANCH_REQUIREMENTS[name])
+                continue
+        for option in branch_options(name):
+            if option in available:
+                needed.append(option)
+                break
+    needed.extend(option for option in OPTIONAL_BRANCHES if option in available)
+    return sorted(set(needed))
+
+
+def missing_required_for_available(available: set[str]) -> list[str]:
+    return [name for name in PVETO_BRANCHES if not available_has_branch(available, name)]
 
 
 def missing_branch_message(name: str) -> str:
     note = BRANCH_NOTES.get(name)
     if note:
         return f"Required branch {name} not found. {note}"
-    return f"Required branch {name} not found in DLS trimmed NanoAOD input."
+    return f"Required branch {name} not found in DLS/OSUNano Pveto input."
+
+
+def exact_branch(arrays, name: str):
+    if name in arrays.fields:
+        return arrays[name]
+    if "_" in name:
+        collection, field = name.split("_", 1)
+        if collection in arrays.fields:
+            return arrays[collection][field]
+    raise KeyError(name)
 
 
 def branch(arrays, name: str):
-    """Read a DLS trimmed NanoAOD branch from uproot arrays or NanoEvents."""
-    if name in arrays.fields:
-        return arrays[name]
+    """Read a canonical DLS Pveto branch, with OSUNano aliases if needed."""
+    if name == "trk_caloTotNoPU" and not has_exact_branch(arrays, name):
+        if all(has_exact_branch(arrays, req) for req in COMPUTED_BRANCH_REQUIREMENTS[name]):
+            calo_total = exact_branch(arrays, "IsoTrack_caloTotal")
+            rho = exact_branch(arrays, "Rho_fixedGridRhoFastjetCentralCalo")
+            return np.maximum(0.0, calo_total - rho * np.pi * 0.4 * 0.4)
 
-    collection, field = name.split("_", 1)
-    if collection in arrays.fields:
-        return arrays[collection][field]
+    for option in branch_options(name):
+        try:
+            return exact_branch(arrays, option)
+        except KeyError:
+            continue
 
     raise KeyError(missing_branch_message(name))
+
+
+def aligned_optional_branch(arrays, name: str, reference_name: str):
+    """Return an optional branch only when its per-event length matches reference."""
+    if not has_branch(arrays, name):
+        return None
+
+    value = branch(arrays, name)
+    reference = branch(arrays, reference_name)
+    try:
+        value_counts = ak.num(value, axis=1)
+        reference_counts = ak.num(reference, axis=1)
+    except Exception:
+        return None
+
+    try:
+        if bool(ak.all(value_counts == reference_counts)):
+            return value
+    except Exception:
+        return None
+    return None
 
 
 def delta_phi(phi1, phi2):
@@ -127,6 +249,28 @@ def trans_mass(arrays, prefix: str):
         * branch(arrays, "metNoMu_pt")
         * (1.0 - np.cos(dphi))
     )
+
+
+def muon_trigger_match_mask(arrays):
+    """Replicate MattWIP muon_isTrigMatched with NanoAOD TrigObj when needed."""
+    saved_match = aligned_optional_branch(arrays, "muon_isTrigMatched", "Muon_pt")
+    if saved_match is not None:
+        return saved_match
+
+    trig_fields = ("TrigObj_id", "TrigObj_filterBits", "TrigObj_eta", "TrigObj_phi")
+    if not all(has_branch(arrays, name) for name in trig_fields):
+        return ak.ones_like(branch(arrays, "Muon_pt"), dtype=bool)
+
+    trig_mask = (np.abs(branch(arrays, "TrigObj_id")) == MUON_TRIGOBJ_ID) & (
+        np.bitwise_and(branch(arrays, "TrigObj_filterBits"), 1 << MUON_ISOMU24_FILTER_BIT) != 0
+    )
+    muons = ak.zip({"eta": branch(arrays, "Muon_eta"), "phi": branch(arrays, "Muon_phi")})
+    trig_objs = ak.zip({"eta": branch(arrays, "TrigObj_eta"), "phi": branch(arrays, "TrigObj_phi")})[
+        trig_mask
+    ]
+    mu, obj = ak.unzip(ak.cartesian([muons, trig_objs], nested=True))
+    dr = np.sqrt((mu.eta - obj.eta) ** 2 + delta_phi(mu.phi, obj.phi) ** 2)
+    return ak.fill_none(ak.any(dr < MUON_TRIGGER_MATCHING_DR, axis=2), False)
 
 
 def min_delta_r_mask(arrays, prefix: str, min_dr: float, obj_mask=None):
@@ -172,12 +316,19 @@ def fiducial_eta_mask(arrays):
 
 
 def muon_tag_mask(arrays):
-    mask = branch(arrays, "muon_isTrigMatched")
+    mask = muon_trigger_match_mask(arrays)
     mask = mask & (branch(arrays, "Muon_pt") > 26)
     mask = mask & (np.abs(branch(arrays, "Muon_eta")) < 2.1)
     mask = mask & branch(arrays, "Muon_tightId")
     mask = mask & (trans_mass(arrays, "Muon") < 40)
     return mask
+
+
+def good_jet_mask(arrays):
+    # Table-16 Pveto uses the track-jet dR veto.  The old jet_isTightLepVeto
+    # convenience branch is not required here and may be absent or unaligned in
+    # central/OSUNano inputs, so use only the kinematic clean-jet definition.
+    return (branch(arrays, "Jet_pt") > 30) & (np.abs(branch(arrays, "Jet_eta")) < 4.5)
 
 
 def probe_track_denominator_mask(arrays, layer: str):
@@ -195,12 +346,7 @@ def probe_track_denominator_mask(arrays, layer: str):
     mask = mask & (np.abs(branch(arrays, "trk_dxy")) < 0.02)
     mask = mask & (np.abs(branch(arrays, "trk_dz")) < 0.5)
 
-    good_jet = (
-        (branch(arrays, "Jet_pt") > 30)
-        & (np.abs(branch(arrays, "Jet_eta")) < 4.5)
-        & branch(arrays, "jet_isTightLepVeto")
-    )
-    mask = mask & min_delta_r_mask(arrays, "Jet", 0.5, obj_mask=good_jet)
+    mask = mask & min_delta_r_mask(arrays, "Jet", 0.5, obj_mask=good_jet_mask(arrays))
     mask = mask & min_delta_r_mask(arrays, "Electron", 0.15)
     mask = mask & (branch(arrays, "trk_caloTotNoPU") < 10)
     mask = mask & layer_mask(arrays, layer)
@@ -249,7 +395,7 @@ def make_tp_cutflow(arrays, layer: str):
 
     add("input event kept by SingleMuon trigger skim", branch(arrays, "HLT_IsoMu24"))
 
-    mu = branch(arrays, "muon_isTrigMatched")
+    mu = muon_trigger_match_mask(arrays)
     mu = mu & (branch(arrays, "Muon_pt") > 26)
     add(">= 1 muons pT > 26 GeV", ak.any(mu, axis=1))
     mu = mu & (np.abs(branch(arrays, "Muon_eta")) < 2.1)
@@ -290,6 +436,8 @@ def make_tp_cutflow(arrays, layer: str):
     add(">= 1 tracks |dz| < 0.5 cm OR |lambda| > 1e-3", ak.any(trk, axis=1))
     trk = trk & ((trk_eta < 0.0) | (trk_eta > 1.42) | (branch(arrays, "trk_phi") < 2.7))
     add(">= 1 tracks eta < 0 OR eta > 1.42 OR phi < 2.7", ak.any(trk, axis=1))
+    trk = trk & min_delta_r_mask(arrays, "Jet", 0.5, obj_mask=good_jet_mask(arrays))
+    add(">= 1 track-jet pairs DeltaRtrack,jet > 0.5", ak.any(trk, axis=1))
 
     muons = build_muon_vectors(arrays, mu)
     tracks_pre_veto = build_track_vectors(arrays, trk)
