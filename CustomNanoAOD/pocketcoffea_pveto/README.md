@@ -9,8 +9,17 @@ The important schema decision is intentional:
 - PCAS reads central NanoAOD kinematics such as `Muon_pt`, `Muon_eta`, `Jet_pt`,
   and `Jet_eta`.
 - PCAS reads custom DLS extras only where central NanoAOD does not already
-  provide the needed definition, such as `muon_isTrigMatched`,
-  `jet_isTightLepVeto`, `metNoMu_pt`, `metNoMu_phi`, and `trk_*`.
+  provide the needed definition, such as `metNoMu_pt`, `metNoMu_phi`, and
+  `trk_*`.
+- For Muon trigger-skimmed production, PCAS does not require
+  `muon_isTrigMatched`. The event sample has already been skimmed with the
+  SingleMuon trigger, so the tag muon selection uses central `Muon_*` offline
+  cuts and the event-level `HLT_IsoMu24` diagnostic.
+- If `jet_isTightLepVeto` is present but not aligned to central `Jet_*`, PCAS
+  falls back to the central jet kinematic definition `Jet_pt > 30` and
+  `abs(Jet_eta) < 4.5` for the track-jet veto. This lets the existing produced
+  files run, but differs from the full clean-jet definition until the NanoAOD
+  producer writes an aligned jet ID/cleaning branch or preserves `Jet_jetId`.
 - PCAS does not require old lowercase duplicate kinematic branches.
 
 ## Files
